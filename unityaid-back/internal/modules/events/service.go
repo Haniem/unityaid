@@ -41,6 +41,62 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 	return s.repository.Delete(ctx, id)
 }
 
+func (s *Service) ListApplications(ctx context.Context, eventID string) ([]Application, error) {
+	return s.repository.ListApplications(ctx, eventID)
+}
+
+func (s *Service) CreateApplication(ctx context.Context, eventID string, request ApplicationRequest, currentUserID string) (Application, error) {
+	userID := request.UserID
+	if userID == "" {
+		userID = currentUserID
+	}
+	return s.repository.CreateApplication(ctx, eventID, userID, request.Message)
+}
+
+func (s *Service) UpdateApplicationStatus(ctx context.Context, eventID string, applicationID string, request ApplicationStatusRequest) (Application, error) {
+	return s.repository.UpdateApplicationStatus(ctx, eventID, applicationID, request.Status)
+}
+
+func (s *Service) DeleteApplication(ctx context.Context, eventID string, applicationID string) error {
+	return s.repository.DeleteApplication(ctx, eventID, applicationID)
+}
+
+func (s *Service) ListAttendance(ctx context.Context, eventID string) ([]Attendance, error) {
+	return s.repository.ListAttendance(ctx, eventID)
+}
+
+func (s *Service) MarkAttendance(ctx context.Context, eventID string, request AttendanceRequest) (Attendance, error) {
+	return s.repository.MarkAttendance(ctx, eventID, request)
+}
+
+func (s *Service) ListShifts(ctx context.Context, eventID string) ([]Shift, error) {
+	return s.repository.ListShifts(ctx, eventID)
+}
+
+func (s *Service) CreateShift(ctx context.Context, eventID string, request ShiftRequest) (Shift, error) {
+	startsAt, err := time.Parse(time.RFC3339, request.StartsAt)
+	if err != nil {
+		return Shift{}, err
+	}
+	endsAt, err := time.Parse(time.RFC3339, request.EndsAt)
+	if err != nil {
+		return Shift{}, err
+	}
+	return s.repository.CreateShift(ctx, eventID, request, startsAt, endsAt)
+}
+
+func (s *Service) ListFeedback(ctx context.Context, eventID string) ([]Feedback, error) {
+	return s.repository.ListFeedback(ctx, eventID)
+}
+
+func (s *Service) CreateFeedback(ctx context.Context, eventID string, userID string, request FeedbackRequest) (Feedback, error) {
+	return s.repository.CreateFeedback(ctx, eventID, userID, request)
+}
+
+func (s *Service) CompleteEvent(ctx context.Context, eventID string) error {
+	return s.repository.CompleteEvent(ctx, eventID)
+}
+
 func parseRange(request UpsertRequest) (time.Time, time.Time, error) {
 	startsAt, err := time.Parse(time.RFC3339, request.StartsAt)
 	if err != nil {

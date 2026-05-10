@@ -10,15 +10,16 @@ import (
 )
 
 type Handler struct {
-	service *Service
+	service    *Service
+	uploadsDir string
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service *Service, uploadsDir string) *Handler {
+	return &Handler{service: service, uploadsDir: uploadsDir}
 }
 
 func (h *Handler) List(c *gin.Context) {
-	items, err := h.service.List(c.Request.Context())
+	items, err := h.service.List(c.Request.Context(), ListFilters{Search: c.Query("search"), Status: c.Query("status"), CategoryID: c.Query("categoryId"), OrganizationID: c.Query("organizationId")})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Не удалось получить новости"})
 		return
@@ -85,4 +86,38 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) ListCategories(c *gin.Context) {
+	items, err := h.service.ListCategories(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not load categories"})
+		return
+	}
+	c.JSON(http.StatusOK, CategoriesResponse{Items: items})
+}
+
+func (h *Handler) CreateCategory(c *gin.Context) {
+	var request struct {
+		Name string `json:"name" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+	item, err := h.service.CreateCategory(c.Request.Context(), request.Name)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Could not create category"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"item": item})
+}
+
+func (h *Handler) CleanupFiles(c *gin.Context) {
+	removed, err := h.service.CleanupUnusedFiles(c.Request.Context(), h.uploadsDir)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not cleanup files"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"removed": removed})
 }

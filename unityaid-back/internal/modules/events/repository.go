@@ -96,7 +96,7 @@ func (r *Repository) Delete(ctx context.Context, id string) error {
 func baseSelect() string {
 	return `
 		SELECT e.id::text, e.organization_id::text, o.name, e.title, e.description, e.format::text, e.status::text,
-			e.starts_at, e.ends_at, e.location, e.max_participants, e.created_by::text, e.created_at, e.updated_at
+			e.starts_at, e.ends_at, e.location, e.max_participants, e.checkin_code, e.created_by::text, e.created_at, e.updated_at
 		FROM events e
 		JOIN organizations o ON o.id = e.organization_id
 	`
@@ -123,6 +123,7 @@ func scanEvent(row scanner) (Event, error) {
 		&item.EndsAt,
 		&location,
 		&maxParticipants,
+		&item.CheckinCode,
 		&createdBy,
 		&item.CreatedAt,
 		&item.UpdatedAt,

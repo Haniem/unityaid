@@ -100,6 +100,9 @@ POST /api/v1/news
 GET /api/v1/news/{id}
 PUT /api/v1/news/{id}
 DELETE /api/v1/news/{id}
+GET /api/v1/news/categories
+POST /api/v1/news/categories
+POST /api/v1/news/cleanup-files
 POST /api/v1/files/news-images
 ```
 
@@ -111,18 +114,41 @@ POST /api/v1/organizations
 GET /api/v1/organizations/{id}
 PUT /api/v1/organizations/{id}
 DELETE /api/v1/organizations/{id}
+GET /api/v1/organizations/{id}/members
+POST /api/v1/organizations/{id}/members
+PATCH /api/v1/organizations/{id}/members/{memberId}
+DELETE /api/v1/organizations/{id}/members/{memberId}
 
 GET /api/v1/events
 POST /api/v1/events
 GET /api/v1/events/{id}
 PUT /api/v1/events/{id}
 DELETE /api/v1/events/{id}
+GET /api/v1/events/{id}/applications
+POST /api/v1/events/{id}/applications
+PATCH /api/v1/events/{id}/applications/{applicationId}
+GET /api/v1/events/{id}/attendance
+POST /api/v1/events/{id}/attendance
+GET /api/v1/events/{id}/shifts
+POST /api/v1/events/{id}/shifts
+GET /api/v1/events/{id}/feedback
+POST /api/v1/events/{id}/feedback
+POST /api/v1/events/{id}/complete
 
 GET /api/v1/tasks
 POST /api/v1/tasks
 GET /api/v1/tasks/{id}
 PUT /api/v1/tasks/{id}
 DELETE /api/v1/tasks/{id}
+POST /api/v1/tasks/{id}/assignments
+GET /api/v1/tasks/{id}/comments
+POST /api/v1/tasks/{id}/comments
+GET /api/v1/tasks/{id}/attachments
+POST /api/v1/tasks/{id}/attachments
+GET /api/v1/tasks/{id}/status-history
+GET /api/v1/tasks/{id}/time-entries
+POST /api/v1/tasks/{id}/time-entries
+POST /api/v1/tasks/{id}/approve
 ```
 
 После изменений backend-кода перезапустите backend-контейнер:

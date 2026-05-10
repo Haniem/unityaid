@@ -15,6 +15,8 @@ const events = ref<EventItem[]>([])
 const editingId = ref<string | null>(null)
 const isModalOpen = ref(false)
 const errorMessage = ref('')
+const statusFilter = ref('')
+const priorityFilter = ref('')
 const form = reactive({
   organizationId: '',
   eventId: '',
@@ -76,7 +78,7 @@ function payload(): TaskPayload {
 
 async function load() {
   const [tasksResponse, organizationsResponse, eventsResponse] = await Promise.all([
-    fetchTasks(),
+    fetchTasks({ status: statusFilter.value, priority: priorityFilter.value }),
     fetchOrganizations(),
     fetchEvents()
   ])
@@ -118,6 +120,23 @@ onMounted(load)
         <Plus :size="18" />
         <span>Создать задачу</span>
       </button>
+    </div>
+
+    <div class="filter-bar">
+      <select v-model="statusFilter" @change="load">
+        <option value="">Все статусы</option>
+        <option value="created">Создана</option>
+        <option value="assigned">Назначена</option>
+        <option value="in_progress">В работе</option>
+        <option value="review">На проверке</option>
+        <option value="completed">Выполнена</option>
+      </select>
+      <select v-model="priorityFilter" @change="load">
+        <option value="">Все приоритеты</option>
+        <option value="low">Низкий</option>
+        <option value="medium">Средний</option>
+        <option value="high">Высокий</option>
+      </select>
     </div>
 
     <div class="task-board">
