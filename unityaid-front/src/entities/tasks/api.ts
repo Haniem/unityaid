@@ -8,6 +8,10 @@ export function fetchTasks() {
   return apiRequest<{ items: TaskItem[] }>('/tasks', { token: token() })
 }
 
+export function fetchTask(id: string) {
+  return apiRequest<{ item: TaskItem }>(`/tasks/${id}`, { token: token() })
+}
+
 export function createTask(payload: TaskPayload) {
   return apiRequest<{ item: TaskItem }>('/tasks', {
     method: 'POST',

@@ -8,6 +8,10 @@ export function fetchOrganizations() {
   return apiRequest<{ items: Organization[] }>('/organizations', { token: token() })
 }
 
+export function fetchOrganization(id: string) {
+  return apiRequest<{ item: Organization }>(`/organizations/${id}`, { token: token() })
+}
+
 export function createOrganization(payload: OrganizationPayload) {
   return apiRequest<{ item: Organization }>('/organizations', {
     method: 'POST',

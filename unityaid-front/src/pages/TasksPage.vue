@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Pencil, Plus, Trash2 } from 'lucide-vue-next'
+import { Eye, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { fetchOrganizations } from '../entities/organizations/api'
 import type { Organization } from '../entities/organizations/types'
 import { fetchEvents } from '../entities/events/api'
@@ -13,6 +13,7 @@ const items = ref<TaskItem[]>([])
 const organizations = ref<Organization[]>([])
 const events = ref<EventItem[]>([])
 const editingId = ref<string | null>(null)
+const isModalOpen = ref(false)
 const errorMessage = ref('')
 const form = reactive({
   organizationId: '',
@@ -35,9 +36,15 @@ function resetForm() {
   form.status = 'created'
   form.priority = 'medium'
   form.dueAt = ''
+  errorMessage.value = ''
 }
 
-function edit(item: TaskItem) {
+function openCreateModal() {
+  resetForm()
+  isModalOpen.value = true
+}
+
+function openEditModal(item: TaskItem) {
   editingId.value = item.id
   form.organizationId = item.organizationId
   form.eventId = item.eventId ?? ''
@@ -46,6 +53,13 @@ function edit(item: TaskItem) {
   form.status = item.status
   form.priority = item.priority
   form.dueAt = toDatetimeLocal(item.dueAt)
+  errorMessage.value = ''
+  isModalOpen.value = true
+}
+
+function closeModal() {
+  isModalOpen.value = false
+  resetForm()
 }
 
 function payload(): TaskPayload {
@@ -77,7 +91,7 @@ async function submit() {
   try {
     if (editingId.value) await updateTask(editingId.value, payload())
     else await createTask(payload())
-    resetForm()
+    closeModal()
     await load()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось сохранить задачу'
@@ -96,12 +110,35 @@ onMounted(load)
 <template>
   <section class="page-section">
     <div class="page-heading">
-      <div><p class="eyebrow">Продуктивность</p><h1>Мои задачи</h1></div>
+      <div>
+        <p class="eyebrow">Продуктивность</p>
+        <h1>Мои задачи</h1>
+      </div>
+      <button class="primary-action" type="button" @click="openCreateModal">
+        <Plus :size="18" />
+        <span>Создать задачу</span>
+      </button>
     </div>
 
-    <div class="management-grid">
-      <form class="entity-form" @submit.prevent="submit">
-        <h2>{{ editingId ? 'Редактирование' : 'Новая задача' }}</h2>
+    <div class="task-board">
+      <article v-for="item in items" :key="item.id" class="task-card">
+        <RouterLink class="task-card-main" :to="`/tasks/${item.id}`">
+          <span :class="['priority-dot', item.priority]"></span>
+          <h2>{{ item.title }}</h2>
+          <p>{{ item.description || 'Описание пока не заполнено.' }}</p>
+          <small>{{ item.organizationName }} · {{ item.eventTitle || 'без мероприятия' }} · {{ formatDateTime(item.dueAt) }}</small>
+        </RouterLink>
+        <div class="card-actions">
+          <RouterLink class="icon-button" :to="`/tasks/${item.id}`" aria-label="Открыть"><Eye :size="17" /></RouterLink>
+          <button class="icon-button" type="button" aria-label="Редактировать" @click="openEditModal(item)"><Pencil :size="17" /></button>
+          <button class="icon-button" type="button" aria-label="Удалить" @click="remove(item)"><Trash2 :size="17" /></button>
+        </div>
+      </article>
+    </div>
+
+    <div v-if="isModalOpen" class="modal-backdrop" @click.self="closeModal">
+      <form class="modal-panel entity-form" @submit.prevent="submit">
+        <h2>{{ editingId ? 'Редактирование задачи' : 'Новая задача' }}</h2>
         <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
         <label><span>Организация</span><select v-model="form.organizationId"><option v-for="org in organizations" :key="org.id" :value="org.id">{{ org.name }}</option></select></label>
         <label><span>Мероприятие</span><select v-model="form.eventId"><option value="">Без мероприятия</option><option v-for="event in filteredEvents" :key="event.id" :value="event.id">{{ event.title }}</option></select></label>
@@ -112,19 +149,8 @@ onMounted(load)
           <label><span>Приоритет</span><select v-model="form.priority"><option value="low">Низкий</option><option value="medium">Средний</option><option value="high">Высокий</option></select></label>
         </div>
         <label><span>Срок</span><input v-model="form.dueAt" type="datetime-local" /></label>
-        <div class="form-actions"><button class="secondary-action" type="button" @click="resetForm">Сбросить</button><button class="primary-action" type="submit"><Plus :size="17" /> Сохранить</button></div>
+        <div class="form-actions"><button class="secondary-action" type="button" @click="closeModal">Отмена</button><button class="primary-action" type="submit">Сохранить</button></div>
       </form>
-
-      <div class="entity-list">
-        <article v-for="item in items" :key="item.id" class="entity-row">
-          <div>
-            <h2>{{ item.title }}</h2>
-            <p>{{ item.description || 'Описание пока не заполнено.' }}</p>
-            <small>{{ item.organizationName }} · {{ item.eventTitle || 'без мероприятия' }} · {{ item.priority }} · {{ formatDateTime(item.dueAt) }}</small>
-          </div>
-          <div class="card-actions static-actions"><button class="icon-button" type="button" @click="edit(item)"><Pencil :size="17" /></button><button class="icon-button" type="button" @click="remove(item)"><Trash2 :size="17" /></button></div>
-        </article>
-      </div>
     </div>
   </section>
 </template>

@@ -7,25 +7,12 @@ import NewsDetailPage from '../pages/NewsDetailPage.vue'
 import NewsFormPage from '../pages/NewsFormPage.vue'
 import NewsListPage from '../pages/NewsListPage.vue'
 import OrganizationsPage from '../pages/OrganizationsPage.vue'
-import PlaceholderPage from '../pages/PlaceholderPage.vue'
 import ProfilePage from '../pages/ProfilePage.vue'
 import EventsPage from '../pages/EventsPage.vue'
 import TasksPage from '../pages/TasksPage.vue'
-
-const placeholderRoutes = [
-  ['team', 'Моя команда'],
-  ['activities', 'Мои активности'],
-  ['learning', 'Мое обучение'],
-  ['growth', 'Мое развитие'],
-  ['employees', 'Сотрудники'],
-  ['knowledge-base', 'База знаний'],
-  ['ideas', 'Есть идея'],
-  ['store', 'Корпоративный магазин']
-].map(([path, title]) => ({
-  path,
-  component: PlaceholderPage,
-  meta: { title }
-}))
+import EventDetailPage from '../pages/EventDetailPage.vue'
+import OrganizationDetailPage from '../pages/OrganizationDetailPage.vue'
+import TaskDetailPage from '../pages/TaskDetailPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -56,6 +43,11 @@ export const router = createRouter({
           component: OrganizationsPage
         },
         {
+          path: 'organizations/:id',
+          name: 'organization-detail',
+          component: OrganizationDetailPage
+        },
+        {
           path: 'company-structure',
           redirect: '/organizations'
         },
@@ -77,9 +69,19 @@ export const router = createRouter({
           component: EventsPage
         },
         {
+          path: 'calendar/:id',
+          name: 'event-detail',
+          component: EventDetailPage
+        },
+        {
           path: 'tasks',
           name: 'tasks',
           component: TasksPage
+        },
+        {
+          path: 'tasks/:id',
+          name: 'task-detail',
+          component: TaskDetailPage
         },
         {
           path: 'news',
@@ -100,8 +102,7 @@ export const router = createRouter({
           path: 'news/:id',
           name: 'news-detail',
           component: NewsDetailPage
-        },
-        ...placeholderRoutes
+        }
       ]
     }
   ]

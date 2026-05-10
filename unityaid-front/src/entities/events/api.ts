@@ -8,6 +8,10 @@ export function fetchEvents() {
   return apiRequest<{ items: EventItem[] }>('/events', { token: token() })
 }
 
+export function fetchEvent(id: string) {
+  return apiRequest<{ item: EventItem }>(`/events/${id}`, { token: token() })
+}
+
 export function createEvent(payload: EventPayload) {
   return apiRequest<{ item: EventItem }>('/events', {
     method: 'POST',

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { Pencil, Plus, Trash2 } from 'lucide-vue-next'
+import { Eye, MapPin, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { createEvent, deleteEvent, fetchEvents, updateEvent } from '../entities/events/api'
 import type { EventItem, EventPayload } from '../entities/events/types'
 import { fetchOrganizations } from '../entities/organizations/api'
@@ -10,6 +10,7 @@ import { formatDateTime, fromDatetimeLocal, toDatetimeLocal } from '../shared/da
 const items = ref<EventItem[]>([])
 const organizations = ref<Organization[]>([])
 const editingId = ref<string | null>(null)
+const isModalOpen = ref(false)
 const errorMessage = ref('')
 const form = reactive({
   organizationId: '',
@@ -36,9 +37,15 @@ function resetForm() {
   form.endsAt = ''
   form.location = ''
   form.maxParticipants = ''
+  errorMessage.value = ''
 }
 
-function edit(item: EventItem) {
+function openCreateModal() {
+  resetForm()
+  isModalOpen.value = true
+}
+
+function openEditModal(item: EventItem) {
   editingId.value = item.id
   form.organizationId = item.organizationId
   form.title = item.title
@@ -49,6 +56,13 @@ function edit(item: EventItem) {
   form.endsAt = toDatetimeLocal(item.endsAt)
   form.location = item.location ?? ''
   form.maxParticipants = item.maxParticipants ? String(item.maxParticipants) : ''
+  errorMessage.value = ''
+  isModalOpen.value = true
+}
+
+function closeModal() {
+  isModalOpen.value = false
+  resetForm()
 }
 
 function payload(): EventPayload {
@@ -75,12 +89,9 @@ async function load() {
 async function submit() {
   errorMessage.value = ''
   try {
-    if (editingId.value) {
-      await updateEvent(editingId.value, payload())
-    } else {
-      await createEvent(payload())
-    }
-    resetForm()
+    if (editingId.value) await updateEvent(editingId.value, payload())
+    else await createEvent(payload())
+    closeModal()
     await load()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось сохранить мероприятие'
@@ -99,12 +110,39 @@ onMounted(load)
 <template>
   <section class="page-section">
     <div class="page-heading">
-      <div><p class="eyebrow">Продуктивность</p><h1>Мероприятия</h1></div>
+      <div>
+        <p class="eyebrow">Продуктивность</p>
+        <h1>Мероприятия</h1>
+      </div>
+      <button class="primary-action" type="button" @click="openCreateModal">
+        <Plus :size="18" />
+        <span>Создать мероприятие</span>
+      </button>
     </div>
 
-    <div class="management-grid">
-      <form class="entity-form" @submit.prevent="submit">
-        <h2>{{ editingId ? 'Редактирование' : 'Новое мероприятие' }}</h2>
+    <div class="event-list">
+      <article v-for="item in items" :key="item.id" class="event-card">
+        <RouterLink class="event-card-main" :to="`/calendar/${item.id}`">
+          <span class="status-pill">{{ item.status }}</span>
+          <h2>{{ item.title }}</h2>
+          <p>{{ item.description || 'Описание пока не заполнено.' }}</p>
+          <div class="meta-line">
+            <MapPin :size="16" />
+            <span>{{ item.location || item.format }} · {{ formatDateTime(item.startsAt) }}</span>
+          </div>
+          <small>{{ item.organizationName }} · лимит {{ item.maxParticipants || 'не указан' }}</small>
+        </RouterLink>
+        <div class="card-actions">
+          <RouterLink class="icon-button" :to="`/calendar/${item.id}`" aria-label="Открыть"><Eye :size="17" /></RouterLink>
+          <button class="icon-button" type="button" aria-label="Редактировать" @click="openEditModal(item)"><Pencil :size="17" /></button>
+          <button class="icon-button" type="button" aria-label="Удалить" @click="remove(item)"><Trash2 :size="17" /></button>
+        </div>
+      </article>
+    </div>
+
+    <div v-if="isModalOpen" class="modal-backdrop" @click.self="closeModal">
+      <form class="modal-panel entity-form" @submit.prevent="submit">
+        <h2>{{ editingId ? 'Редактирование мероприятия' : 'Новое мероприятие' }}</h2>
         <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
         <div v-if="!hasOrganizations" class="empty-state">Сначала создайте организацию.</div>
         <template v-else>
@@ -123,20 +161,9 @@ onMounted(load)
             <label><span>Место</span><input v-model="form.location" /></label>
             <label><span>Лимит участников</span><input v-model="form.maxParticipants" type="number" min="1" /></label>
           </div>
-          <div class="form-actions"><button class="secondary-action" type="button" @click="resetForm">Сбросить</button><button class="primary-action" type="submit"><Plus :size="17" /> Сохранить</button></div>
+          <div class="form-actions"><button class="secondary-action" type="button" @click="closeModal">Отмена</button><button class="primary-action" type="submit">Сохранить</button></div>
         </template>
       </form>
-
-      <div class="entity-list">
-        <article v-for="item in items" :key="item.id" class="entity-row">
-          <div>
-            <h2>{{ item.title }}</h2>
-            <p>{{ item.description || 'Описание пока не заполнено.' }}</p>
-            <small>{{ item.organizationName }} · {{ formatDateTime(item.startsAt) }} · {{ item.format }}</small>
-          </div>
-          <div class="card-actions static-actions"><button class="icon-button" type="button" @click="edit(item)"><Pencil :size="17" /></button><button class="icon-button" type="button" @click="remove(item)"><Trash2 :size="17" /></button></div>
-        </article>
-      </div>
     </div>
   </section>
 </template>
