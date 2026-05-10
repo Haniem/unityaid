@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Bell, HelpCircle, Languages, LogOut, MessageCircle, Plus, Search, UserRound } from 'lucide-vue-next'
-import { authState, logout, setLocale } from '../../entities/auth/store'
+import { authState, logoutRemote, setLocale } from '../../entities/auth/store'
 
 const router = useRouter()
 const isMenuOpen = ref(false)
@@ -20,7 +20,7 @@ function changeLocale(locale: 'ru' | 'en') {
 }
 
 async function signOut() {
-  logout()
+  await logoutRemote()
   await router.push('/login')
 }
 </script>

@@ -49,13 +49,48 @@ coord@ecopulse.test
 volunteer3@test.local
 ```
 
+## Инфраструктурные команды
+
+Для частых операций добавлен `Makefile`:
+
+```powershell
+make up
+make down
+make logs
+make ps
+make migrate
+make seed
+```
+
+Отдельные backend-команды миграций и сидов можно запускать напрямую:
+
+```powershell
+docker compose run --rm backend go run ./cmd/migrate
+docker compose run --rm backend go run ./cmd/seed
+```
+
+Для production-сборки добавлены отдельные Dockerfile:
+
+```powershell
+docker build -f unityaid-back/Dockerfile.prod -t unityaid-back:prod ./unityaid-back
+docker build -f unityaid-front/Dockerfile.prod -t unityaid-front:prod ./unityaid-front
+```
+
 ## Auth API
 
 ```http
+POST /api/v1/auth/register
 POST /api/v1/auth/login
+POST /api/v1/auth/refresh
 GET /api/v1/auth/me
 POST /api/v1/auth/logout
+POST /api/v1/auth/forgot-password
+POST /api/v1/auth/reset-password
+POST /api/v1/auth/verify-email
+POST /api/v1/auth/change-password
 ```
+
+В development-режиме endpoints регистрации, подтверждения email и восстановления пароля возвращают dev-токен в поле `token`, чтобы сценарий можно было проверить без почтового сервиса.
 
 ## News API
 

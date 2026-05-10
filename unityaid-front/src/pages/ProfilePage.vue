@@ -1,5 +1,29 @@
 <script setup lang="ts">
-import { authState } from '../entities/auth/store'
+import { ref } from 'vue'
+import { authState, changePassword } from '../entities/auth/store'
+
+const currentPassword = ref('')
+const newPassword = ref('')
+const isSubmitting = ref(false)
+const errorMessage = ref('')
+const successMessage = ref('')
+
+async function submitPasswordChange() {
+  errorMessage.value = ''
+  successMessage.value = ''
+  isSubmitting.value = true
+
+  try {
+    await changePassword(currentPassword.value, newPassword.value)
+    currentPassword.value = ''
+    newPassword.value = ''
+    successMessage.value = 'Пароль обновлен'
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось сменить пароль'
+  } finally {
+    isSubmitting.value = false
+  }
+}
 </script>
 
 <template>
@@ -20,14 +44,42 @@ import { authState } from '../entities/auth/store'
           <dd>{{ authState.user?.primaryRole }}</dd>
         </div>
         <div>
+          <dt>Email</dt>
+          <dd>{{ authState.user?.isEmailVerified ? 'Подтвержден' : 'Не подтвержден' }}</dd>
+        </div>
+        <div>
           <dt>Язык</dt>
           <dd>{{ authState.user?.locale === 'en' ? 'English' : 'Русский' }}</dd>
         </div>
         <div>
           <dt>Организации</dt>
-          <dd>{{ authState.user?.organizations.map((item) => item.organizationName).join(', ') }}</dd>
+          <dd>{{ authState.user?.organizations.map((item) => item.organizationName).join(', ') || 'Нет организаций' }}</dd>
         </div>
       </dl>
     </div>
+
+    <form class="profile-panel password-panel" @submit.prevent="submitPasswordChange">
+      <div>
+        <p class="eyebrow">Безопасность</p>
+        <h2>Смена пароля</h2>
+      </div>
+
+      <label>
+        <span>Текущий пароль</span>
+        <input v-model="currentPassword" type="password" autocomplete="current-password" required />
+      </label>
+
+      <label>
+        <span>Новый пароль</span>
+        <input v-model="newPassword" type="password" autocomplete="new-password" minlength="8" required />
+      </label>
+
+      <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
+      <p v-if="successMessage" class="form-success">{{ successMessage }}</p>
+
+      <button class="primary-action" type="submit" :disabled="isSubmitting">
+        {{ isSubmitting ? 'Сохраняем...' : 'Обновить пароль' }}
+      </button>
+    </form>
   </section>
 </template>

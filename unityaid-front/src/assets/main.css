@@ -128,7 +128,8 @@ a {
   margin-top: 22px;
 }
 
-.auth-form label span {
+.auth-form label span,
+.password-panel label span {
   display: block;
   margin-bottom: 8px;
   color: #5f667d;
@@ -136,6 +137,7 @@ a {
 }
 
 .auth-form input,
+.password-panel input,
 .topbar-search input {
   width: 100%;
   border: 1px solid #dde1ec;
@@ -144,13 +146,15 @@ a {
   background: #ffffff;
 }
 
-.auth-form input {
+.auth-form input,
+.password-panel input {
   height: 48px;
   padding: 0 14px;
   border-radius: 8px;
 }
 
 .auth-form input:focus,
+.password-panel input:focus,
 .topbar-search:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px rgba(47, 159, 114, 0.14);
@@ -218,6 +222,43 @@ a {
   margin: 14px 0 0;
   color: #c24132;
   font-size: 0.92rem;
+}
+
+.form-success {
+  margin: 14px 0 0;
+  color: #287a56;
+  font-size: 0.92rem;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 22px;
+  padding: 4px;
+  border: 1px solid #dde1ec;
+  border-radius: 8px;
+  background: #f6f8fb;
+}
+
+.auth-tabs button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 6px;
+  color: #5f667d;
+  background: transparent;
+  cursor: pointer;
+}
+
+.auth-tabs button.active {
+  color: #121a2f;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(18, 26, 47, 0.1);
+}
+
+.auth-link {
+  width: 100%;
+  margin-top: 10px;
 }
 
 .demo-hint {
@@ -592,6 +633,20 @@ a {
   display: flex;
   align-items: flex-start;
   gap: 24px;
+}
+
+.password-panel {
+  display: grid;
+  max-width: 520px;
+}
+
+.password-panel h2 {
+  margin: 0;
+}
+
+.password-panel label {
+  display: block;
+  margin-top: 18px;
 }
 
 .profile-panel img {

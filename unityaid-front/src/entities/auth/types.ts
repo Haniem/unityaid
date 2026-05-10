@@ -13,6 +13,7 @@ export type User = {
   patronymic?: string | null
   avatarUrl?: string | null
   locale: 'ru' | 'en'
+  isEmailVerified: boolean
   isActive: boolean
   primaryRole: Membership['role']
   organizationId?: string | null
@@ -21,7 +22,13 @@ export type User = {
 
 export type LoginResponse = {
   accessToken: string
+  refreshToken: string
   tokenType: string
   expiresIn: number
   user: User
+}
+
+export type DevTokenResponse = {
+  status: string
+  token?: string
 }
