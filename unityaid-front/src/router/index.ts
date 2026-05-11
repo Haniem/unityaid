@@ -13,6 +13,7 @@ import TasksPage from '../pages/TasksPage.vue'
 import EventDetailPage from '../pages/EventDetailPage.vue'
 import OrganizationDetailPage from '../pages/OrganizationDetailPage.vue'
 import TaskDetailPage from '../pages/TaskDetailPage.vue'
+import VolunteersPage from '../pages/VolunteersPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -46,6 +47,11 @@ export const router = createRouter({
           path: 'organizations/:id',
           name: 'organization-detail',
           component: OrganizationDetailPage
+        },
+        {
+          path: 'volunteers',
+          name: 'volunteers',
+          component: VolunteersPage
         },
         {
           path: 'company-structure',

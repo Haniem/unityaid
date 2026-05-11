@@ -1,61 +1,41 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { Eye, Pencil, Plus, Trash2 } from 'lucide-vue-next'
-import { fetchOrganizations } from '../entities/organizations/api'
-import type { Organization } from '../entities/organizations/types'
-import { fetchEvents } from '../entities/events/api'
-import type { EventItem } from '../entities/events/types'
 import { createTask, deleteTask, fetchTasks, updateTask } from '../entities/tasks/api'
 import type { TaskItem, TaskPayload } from '../entities/tasks/types'
-import { formatDateTime, fromDatetimeLocal, toDatetimeLocal } from '../shared/date'
+import { fetchCreateForm, fetchEditForm } from '../entities/forms/api'
+import type { BackendForm, FormModel } from '../entities/forms/types'
+import DynamicForm from '../shared/ui/DynamicForm.vue'
+import { isoFromDatetimeLocal, modelFromForm, nullable, stringValue } from '../shared/forms'
+import { formatDateTime } from '../shared/date'
 
 const items = ref<TaskItem[]>([])
-const organizations = ref<Organization[]>([])
-const events = ref<EventItem[]>([])
 const editingId = ref<string | null>(null)
 const isModalOpen = ref(false)
 const errorMessage = ref('')
 const statusFilter = ref('')
 const priorityFilter = ref('')
-const form = reactive({
-  organizationId: '',
-  eventId: '',
-  title: '',
-  description: '',
-  status: 'created' as TaskPayload['status'],
-  priority: 'medium' as TaskPayload['priority'],
-  dueAt: ''
-})
-
-const filteredEvents = computed(() => events.value.filter((event) => event.organizationId === form.organizationId))
+const formSchema = ref<BackendForm | null>(null)
+const formModel = ref<FormModel>({})
 
 function resetForm() {
   editingId.value = null
-  form.organizationId = organizations.value[0]?.id ?? ''
-  form.eventId = ''
-  form.title = ''
-  form.description = ''
-  form.status = 'created'
-  form.priority = 'medium'
-  form.dueAt = ''
+  formSchema.value = null
+  formModel.value = {}
   errorMessage.value = ''
 }
 
-function openCreateModal() {
+async function openCreateModal() {
   resetForm()
+  formSchema.value = await fetchCreateForm('tasks')
+  formModel.value = modelFromForm(formSchema.value)
   isModalOpen.value = true
 }
 
-function openEditModal(item: TaskItem) {
+async function openEditModal(item: TaskItem) {
   editingId.value = item.id
-  form.organizationId = item.organizationId
-  form.eventId = item.eventId ?? ''
-  form.title = item.title
-  form.description = item.description
-  form.status = item.status
-  form.priority = item.priority
-  form.dueAt = toDatetimeLocal(item.dueAt)
-  errorMessage.value = ''
+  formSchema.value = await fetchEditForm('tasks', item.id)
+  formModel.value = modelFromForm(formSchema.value)
   isModalOpen.value = true
 }
 
@@ -66,26 +46,18 @@ function closeModal() {
 
 function payload(): TaskPayload {
   return {
-    organizationId: form.organizationId,
-    eventId: form.eventId || null,
-    title: form.title,
-    description: form.description,
-    status: form.status,
-    priority: form.priority,
-    dueAt: form.dueAt ? fromDatetimeLocal(form.dueAt) : null
+    organizationId: stringValue(formModel.value.organizationId),
+    eventId: nullable(formModel.value.eventId) as string | null,
+    title: stringValue(formModel.value.title),
+    description: stringValue(formModel.value.description),
+    status: (stringValue(formModel.value.status) || 'created') as TaskPayload['status'],
+    priority: (stringValue(formModel.value.priority) || 'medium') as TaskPayload['priority'],
+    dueAt: isoFromDatetimeLocal(formModel.value.dueAt)
   }
 }
 
 async function load() {
-  const [tasksResponse, organizationsResponse, eventsResponse] = await Promise.all([
-    fetchTasks({ status: statusFilter.value, priority: priorityFilter.value }),
-    fetchOrganizations(),
-    fetchEvents()
-  ])
-  items.value = tasksResponse.items
-  organizations.value = organizationsResponse.items
-  events.value = eventsResponse.items
-  if (!form.organizationId) resetForm()
+  items.value = (await fetchTasks({ status: statusFilter.value, priority: priorityFilter.value })).items
 }
 
 async function submit() {
@@ -113,30 +85,36 @@ onMounted(load)
   <section class="page-section">
     <div class="page-heading">
       <div>
-        <p class="eyebrow">Продуктивность</p>
+        <p class="eyebrow">Раздел</p>
         <h1>Мои задачи</h1>
       </div>
       <button class="primary-action" type="button" @click="openCreateModal">
         <Plus :size="18" />
-        <span>Создать задачу</span>
+        <span>Создать</span>
       </button>
     </div>
 
     <div class="filter-bar">
-      <select v-model="statusFilter" @change="load">
-        <option value="">Все статусы</option>
-        <option value="created">Создана</option>
-        <option value="assigned">Назначена</option>
-        <option value="in_progress">В работе</option>
-        <option value="review">На проверке</option>
-        <option value="completed">Выполнена</option>
-      </select>
-      <select v-model="priorityFilter" @change="load">
-        <option value="">Все приоритеты</option>
-        <option value="low">Низкий</option>
-        <option value="medium">Средний</option>
-        <option value="high">Высокий</option>
-      </select>
+      <label class="filter-select">
+        <span>Статус</span>
+        <select v-model="statusFilter" @change="load">
+          <option value="">Все статусы</option>
+          <option value="created">Создана</option>
+          <option value="assigned">Назначена</option>
+          <option value="in_progress">В работе</option>
+          <option value="review">На проверке</option>
+          <option value="completed">Выполнена</option>
+        </select>
+      </label>
+      <label class="filter-select">
+        <span>Приоритет</span>
+        <select v-model="priorityFilter" @change="load">
+          <option value="">Все приоритеты</option>
+          <option value="low">Низкий</option>
+          <option value="medium">Средний</option>
+          <option value="high">Высокий</option>
+        </select>
+      </label>
     </div>
 
     <div class="task-board">
@@ -157,18 +135,13 @@ onMounted(load)
 
     <div v-if="isModalOpen" class="modal-backdrop" @click.self="closeModal">
       <form class="modal-panel entity-form" @submit.prevent="submit">
-        <h2>{{ editingId ? 'Редактирование задачи' : 'Новая задача' }}</h2>
+        <h2>{{ formSchema?.meta.title || (editingId ? 'Редактирование задачи' : 'Новая задача') }}</h2>
         <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
-        <label><span>Организация</span><select v-model="form.organizationId"><option v-for="org in organizations" :key="org.id" :value="org.id">{{ org.name }}</option></select></label>
-        <label><span>Мероприятие</span><select v-model="form.eventId"><option value="">Без мероприятия</option><option v-for="event in filteredEvents" :key="event.id" :value="event.id">{{ event.title }}</option></select></label>
-        <label><span>Название</span><input v-model="form.title" required /></label>
-        <label><span>Описание</span><textarea v-model="form.description" rows="4" /></label>
-        <div class="form-columns">
-          <label><span>Статус</span><select v-model="form.status"><option value="created">Создана</option><option value="assigned">Назначена</option><option value="in_progress">В работе</option><option value="review">На проверке</option><option value="completed">Выполнена</option><option value="cancelled">Отменена</option></select></label>
-          <label><span>Приоритет</span><select v-model="form.priority"><option value="low">Низкий</option><option value="medium">Средний</option><option value="high">Высокий</option></select></label>
+        <DynamicForm v-if="formSchema" v-model="formModel" :form="formSchema" />
+        <div class="form-actions">
+          <button class="secondary-action" type="button" @click="closeModal">Отмена</button>
+          <button class="primary-action" type="submit">Сохранить</button>
         </div>
-        <label><span>Срок</span><input v-model="form.dueAt" type="datetime-local" /></label>
-        <div class="form-actions"><button class="secondary-action" type="button" @click="closeModal">Отмена</button><button class="primary-action" type="submit">Сохранить</button></div>
       </form>
     </div>
   </section>

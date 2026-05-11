@@ -20,6 +20,14 @@ func NewHandler(uploadsDir string) *Handler {
 }
 
 func (h *Handler) UploadNewsImage(c *gin.Context) {
+	h.uploadImage(c, "news")
+}
+
+func (h *Handler) UploadOrganizationLogo(c *gin.Context) {
+	h.uploadImage(c, "organizations")
+}
+
+func (h *Handler) uploadImage(c *gin.Context, folder string) {
 	file, err := c.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_file", "message": "Файл не передан"})
@@ -37,7 +45,7 @@ func (h *Handler) UploadNewsImage(c *gin.Context) {
 		return
 	}
 
-	dir := filepath.Join(h.uploadsDir, "news")
+	dir := filepath.Join(h.uploadsDir, folder)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Не удалось подготовить папку загрузок"})
 		return
@@ -50,7 +58,7 @@ func (h *Handler) UploadNewsImage(c *gin.Context) {
 		return
 	}
 
-	url := requestBaseURL(c) + "/uploads/news/" + name
+	url := requestBaseURL(c) + "/uploads/" + folder + "/" + name
 	c.JSON(http.StatusCreated, gin.H{"url": url})
 }
 

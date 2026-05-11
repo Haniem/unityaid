@@ -1,28 +1,34 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Bell, HelpCircle, Languages, LogOut, MessageCircle, Plus, Search, UserRound } from 'lucide-vue-next'
-import { authState, logoutRemote, setLocale } from '../../entities/auth/store'
+import { Bell, HelpCircle, LogOut, MessageCircle, Plus, Search, UserRound } from 'lucide-vue-next'
+import { authState, logoutRemote } from '../../entities/auth/store'
 
 const router = useRouter()
 const isMenuOpen = ref(false)
+const popoverRef = ref<HTMLElement | null>(null)
+const avatarRef = ref<HTMLElement | null>(null)
 
 const fullName = computed(() => {
   const user = authState.user
-  if (!user) {
-    return ''
-  }
+  if (!user) return ''
   return [user.lastName, user.firstName, user.patronymic].filter(Boolean).join(' ')
 })
 
-function changeLocale(locale: 'ru' | 'en') {
-  setLocale(locale)
+function closeOutside(event: MouseEvent) {
+  const target = event.target as Node
+  if (!isMenuOpen.value) return
+  if (popoverRef.value?.contains(target) || avatarRef.value?.contains(target)) return
+  isMenuOpen.value = false
 }
 
 async function signOut() {
   await logoutRemote()
   await router.push('/login')
 }
+
+onMounted(() => document.addEventListener('mousedown', closeOutside))
+onBeforeUnmount(() => document.removeEventListener('mousedown', closeOutside))
 </script>
 
 <template>
@@ -40,12 +46,12 @@ async function signOut() {
         <span class="badge">57</span>
       </button>
       <button class="icon-button" type="button" aria-label="FAQ"><HelpCircle :size="19" /></button>
-      <button class="avatar-button" type="button" aria-label="Меню пользователя" @click="isMenuOpen = !isMenuOpen">
+      <button ref="avatarRef" class="avatar-button" type="button" aria-label="Меню пользователя" @click="isMenuOpen = !isMenuOpen">
         <img :src="authState.user?.avatarUrl ?? 'https://i.pravatar.cc/160?img=12'" alt="" />
       </button>
     </div>
 
-    <div v-if="isMenuOpen" class="user-popover">
+    <div v-if="isMenuOpen" ref="popoverRef" class="user-popover">
       <div class="popover-user">
         <img :src="authState.user?.avatarUrl ?? 'https://i.pravatar.cc/160?img=12'" alt="" />
         <strong>{{ fullName }}</strong>
@@ -55,26 +61,6 @@ async function signOut() {
         <UserRound :size="17" />
         <span>Мой профиль</span>
       </RouterLink>
-
-      <div class="popover-row">
-        <span><Languages :size="17" /> Язык</span>
-        <div class="segmented">
-          <button
-            type="button"
-            :class="{ active: authState.user?.locale === 'ru' }"
-            @click="changeLocale('ru')"
-          >
-            Русский
-          </button>
-          <button
-            type="button"
-            :class="{ active: authState.user?.locale === 'en' }"
-            @click="changeLocale('en')"
-          >
-            EN
-          </button>
-        </div>
-      </div>
 
       <button class="popover-link danger" type="button" @click="signOut">
         <LogOut :size="17" />

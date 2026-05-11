@@ -10,11 +10,12 @@ import (
 )
 
 type Handler struct {
-	service *Service
+	service    *Service
+	authorizer *auth.Authorizer
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service *Service, authorizer *auth.Authorizer) *Handler {
+	return &Handler{service: service, authorizer: authorizer}
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -46,6 +47,9 @@ func (h *Handler) Create(c *gin.Context) {
 		return
 	}
 	claims, _ := auth.GetClaims(c)
+	if !h.requireCanManageContent(c, request.OrganizationID) {
+		return
+	}
 	item, err := h.service.Create(c.Request.Context(), request, claims.UserID)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Проверьте даты и поля мероприятия"})
@@ -60,6 +64,23 @@ func (h *Handler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
 		return
 	}
+	existing, err := h.service.FindByID(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "РњРµСЂРѕРїСЂРёСЏС‚РёРµ РЅРµ РЅР°Р№РґРµРЅРѕ"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "РќРµ СѓРґР°Р»РѕСЃСЊ РїРѕР»СѓС‡РёС‚СЊ РјРµСЂРѕРїСЂРёСЏС‚РёРµ"})
+		return
+	}
+	if !h.requireCanManageContent(c, existing.OrganizationID) {
+		return
+	}
+	if request.OrganizationID != existing.OrganizationID {
+		if !h.requireCanManageContent(c, request.OrganizationID) {
+			return
+		}
+	}
 	item, err := h.service.Update(c.Request.Context(), c.Param("id"), request)
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
@@ -73,6 +94,9 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
+	if !h.requireCanManageEvent(c, c.Param("id")) {
+		return
+	}
 	if err := h.service.Delete(c.Request.Context(), c.Param("id")); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Мероприятие не найдено"})
@@ -111,6 +135,9 @@ func (h *Handler) UpdateApplication(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
 		return
 	}
+	if !h.requireCanManageEvent(c, c.Param("id")) {
+		return
+	}
 	item, err := h.service.UpdateApplicationStatus(c.Request.Context(), c.Param("id"), c.Param("applicationId"), request)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Could not update application"})
@@ -120,6 +147,9 @@ func (h *Handler) UpdateApplication(c *gin.Context) {
 }
 
 func (h *Handler) DeleteApplication(c *gin.Context) {
+	if !h.requireCanManageEvent(c, c.Param("id")) {
+		return
+	}
 	if err := h.service.DeleteApplication(c.Request.Context(), c.Param("id"), c.Param("applicationId")); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Application not found"})
 		return
@@ -140,6 +170,9 @@ func (h *Handler) MarkAttendance(c *gin.Context) {
 	var request AttendanceRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+	if !h.requireCanManageEvent(c, c.Param("id")) {
 		return
 	}
 	item, err := h.service.MarkAttendance(c.Request.Context(), c.Param("id"), request)
@@ -163,6 +196,9 @@ func (h *Handler) CreateShift(c *gin.Context) {
 	var request ShiftRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+	if !h.requireCanManageEvent(c, c.Param("id")) {
 		return
 	}
 	item, err := h.service.CreateShift(c.Request.Context(), c.Param("id"), request)
@@ -198,9 +234,47 @@ func (h *Handler) CreateFeedback(c *gin.Context) {
 }
 
 func (h *Handler) Complete(c *gin.Context) {
+	if !h.requireCanManageEvent(c, c.Param("id")) {
+		return
+	}
 	if err := h.service.CompleteEvent(c.Request.Context(), c.Param("id")); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not complete event"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *Handler) requireCanManageEvent(c *gin.Context, eventID string) bool {
+	item, err := h.service.FindByID(c.Request.Context(), eventID)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "РњРµСЂРѕРїСЂРёСЏС‚РёРµ РЅРµ РЅР°Р№РґРµРЅРѕ"})
+			return false
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "РќРµ СѓРґР°Р»РѕСЃСЊ РїСЂРѕРІРµСЂРёС‚СЊ РјРµСЂРѕРїСЂРёСЏС‚РёРµ"})
+		return false
+	}
+	return h.requireCanManageContent(c, item.OrganizationID)
+}
+
+func (h *Handler) requireCanManageContent(c *gin.Context, organizationID string) bool {
+	claims, ok := auth.GetClaims(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "Authorization is required"})
+		return false
+	}
+	allowed, err := h.authorizer.CanManageContent(c.Request.Context(), claims, organizationID)
+	return h.handlePermission(c, allowed, err)
+}
+
+func (h *Handler) handlePermission(c *gin.Context, allowed bool, err error) bool {
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not check permissions"})
+		return false
+	}
+	if !allowed {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden", "message": "Insufficient permissions"})
+		return false
+	}
+	return true
 }

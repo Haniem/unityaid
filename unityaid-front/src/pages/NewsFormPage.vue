@@ -1,49 +1,45 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Heading1, Heading2, ImagePlus, Link, List, Save } from 'lucide-vue-next'
-import { createNews, createNewsCategory, fetchNewsCategories, fetchNewsItem, updateNews, uploadNewsImage } from '../entities/news/api'
-import type { NewsCategory, NewsPayload } from '../entities/news/types'
-import { fromDatetimeLocal, toDatetimeLocal } from '../shared/date'
+import { Heading1, Heading2, ImagePlus, Link, List, Plus, Save } from 'lucide-vue-next'
+import { createNews, createNewsCategory, fetchNewsItem, updateNews, uploadNewsImage } from '../entities/news/api'
+import type { NewsPayload } from '../entities/news/types'
+import { fetchCreateForm, fetchEditForm } from '../entities/forms/api'
+import type { BackendForm, FormModel } from '../entities/forms/types'
+import DynamicForm from '../shared/ui/DynamicForm.vue'
+import { isoFromDatetimeLocal, modelFromForm, nullable, stringValue } from '../shared/forms'
 
 const route = useRoute()
 const router = useRouter()
 
 const editorRef = ref<HTMLElement | null>(null)
 const fileInputRef = ref<HTMLInputElement | null>(null)
-const categories = ref<NewsCategory[]>([])
-const title = ref('')
-const summary = ref('')
+const formSchema = ref<BackendForm | null>(null)
+const formModel = ref<FormModel>({})
 const contentHtml = ref('')
-const coverImageUrl = ref<string | null>(null)
-const status = ref<NewsPayload['status']>('published')
-const scheduledAt = ref('')
-const categoryId = ref('')
 const newCategoryName = ref('')
 const isLoading = ref(false)
 const isSaving = ref(false)
 const errorMessage = ref('')
+const categoryError = ref('')
 
 const newsId = computed(() => (typeof route.params.id === 'string' ? route.params.id : null))
 const isEdit = computed(() => Boolean(newsId.value))
 
 async function loadNews() {
-  categories.value = (await fetchNewsCategories()).items
-  if (!newsId.value) return
   isLoading.value = true
+  errorMessage.value = ''
   try {
-    const response = await fetchNewsItem(newsId.value)
-    title.value = response.item.title
-    summary.value = response.item.summary
-    contentHtml.value = response.item.contentHtml
-    coverImageUrl.value = response.item.coverImageUrl ?? null
-    status.value = response.item.status
-    scheduledAt.value = toDatetimeLocal(response.item.scheduledAt)
-    categoryId.value = response.item.categoryId ?? ''
+    formSchema.value = newsId.value ? await fetchEditForm('news', newsId.value) : await fetchCreateForm('news')
+    formModel.value = modelFromForm(formSchema.value)
+    if (newsId.value) {
+      const response = await fetchNewsItem(newsId.value)
+      contentHtml.value = response.item.contentHtml
+    }
     await nextTick()
     if (editorRef.value) editorRef.value.innerHTML = contentHtml.value
   } catch (error) {
-    errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить новость'
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить форму новости'
   } finally {
     isLoading.value = false
   }
@@ -73,7 +69,7 @@ async function uploadImage(event: Event) {
   if (!file) return
   try {
     const response = await uploadNewsImage(file)
-    if (!coverImageUrl.value) coverImageUrl.value = response.url
+    if (!formModel.value.coverImageUrl) formModel.value = { ...formModel.value, coverImageUrl: response.url }
     document.execCommand('insertImage', false, response.url)
     syncEditor()
   } catch (error) {
@@ -84,11 +80,17 @@ async function uploadImage(event: Event) {
 }
 
 async function addCategory() {
-  if (!newCategoryName.value.trim()) return
-  const response = await createNewsCategory(newCategoryName.value)
-  categories.value.push(response.item)
-  categoryId.value = response.item.id
-  newCategoryName.value = ''
+  const name = newCategoryName.value.trim()
+  if (!name) return
+  categoryError.value = ''
+  try {
+    const response = await createNewsCategory(name)
+    formSchema.value = newsId.value ? await fetchEditForm('news', newsId.value) : await fetchCreateForm('news')
+    formModel.value = { ...formModel.value, categoryId: response.item.id }
+    newCategoryName.value = ''
+  } catch (error) {
+    categoryError.value = error instanceof Error ? error.message : 'Не удалось добавить категорию'
+  }
 }
 
 async function submit() {
@@ -98,13 +100,13 @@ async function submit() {
 
   try {
     const payload: NewsPayload = {
-      title: title.value,
-      summary: summary.value,
+      title: stringValue(formModel.value.title),
+      summary: stringValue(formModel.value.summary),
       contentHtml: contentHtml.value,
-      coverImageUrl: coverImageUrl.value,
-      categoryId: categoryId.value || null,
-      status: status.value,
-      scheduledAt: status.value === 'scheduled' && scheduledAt.value ? fromDatetimeLocal(scheduledAt.value) : null
+      coverImageUrl: nullable(formModel.value.coverImageUrl) as string | null,
+      categoryId: nullable(formModel.value.categoryId) as string | null,
+      status: (stringValue(formModel.value.status) || 'published') as NewsPayload['status'],
+      scheduledAt: formModel.value.status === 'scheduled' ? isoFromDatetimeLocal(formModel.value.scheduledAt) : null
     }
     const response = isEdit.value && newsId.value ? await updateNews(newsId.value, payload) : await createNews(payload)
     await router.push(`/news/${response.item.id}`)
@@ -122,26 +124,30 @@ onMounted(loadNews)
   <section class="page-section">
     <div class="page-heading">
       <div>
-        <p class="eyebrow">Новости</p>
+        <p class="eyebrow">Раздел</p>
         <h1>{{ isEdit ? 'Редактирование новости' : 'Создание новости' }}</h1>
       </div>
     </div>
 
     <form class="news-form" @submit.prevent="submit">
       <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
-      <div v-if="isLoading" class="empty-state">Загрузка новости...</div>
+      <div v-if="isLoading" class="empty-state">Загрузка формы...</div>
 
       <template v-else>
-        <label><span>Заголовок</span><input v-model="title" type="text" required /></label>
-        <label><span>Краткое описание</span><textarea v-model="summary" rows="3" /></label>
-        <div class="form-columns">
-          <label><span>Статус</span><select v-model="status"><option value="published">Опубликовано</option><option value="scheduled">По расписанию</option><option value="draft">Черновик</option></select></label>
-          <label><span>Дата публикации</span><input v-model="scheduledAt" type="datetime-local" :disabled="status !== 'scheduled'" /></label>
-        </div>
-        <div class="form-columns">
-          <label><span>Категория</span><select v-model="categoryId"><option value="">Без категории</option><option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option></select></label>
-          <label><span>Новая категория</span><span class="inline-input"><input v-model="newCategoryName" /><button class="secondary-action" type="button" @click="addCategory">Добавить</button></span></label>
-        </div>
+        <DynamicForm v-if="formSchema" v-model="formModel" :form="formSchema" />
+
+        <label class="form-field category-create">
+          <span class="field-label">
+            <span>Новая категория</span>
+            <span class="requirement-badge optional">необязательно</span>
+          </span>
+          <span class="inline-input">
+            <input v-model="newCategoryName" placeholder="Например, обучение" />
+            <button class="secondary-action" type="button" @click="addCategory"><Plus :size="16" />Добавить</button>
+          </span>
+          <small class="field-help">Категория появится в списке выбора сразу после создания.</small>
+          <small v-if="categoryError" class="form-error">{{ categoryError }}</small>
+        </label>
 
         <div class="editor-shell">
           <div class="editor-toolbar">
@@ -157,14 +163,12 @@ onMounted(loadNews)
           <div ref="editorRef" class="wysiwyg-editor" contenteditable="true" data-placeholder="Введите текст новости" @input="syncEditor"></div>
         </div>
 
-        <div v-if="coverImageUrl" class="cover-preview">
-          <span>Обложка новости</span>
-          <img :src="coverImageUrl" alt="" />
-        </div>
-
         <div class="form-actions">
           <RouterLink class="secondary-action" to="/news">Отмена</RouterLink>
-          <button class="primary-action" type="submit" :disabled="isSaving"><Save :size="18" /><span>{{ isSaving ? 'Сохранение...' : 'Сохранить' }}</span></button>
+          <button class="primary-action" type="submit" :disabled="isSaving">
+            <Save :size="18" />
+            <span>{{ isSaving ? 'Сохранение...' : 'Сохранить' }}</span>
+          </button>
         </div>
       </template>
     </form>

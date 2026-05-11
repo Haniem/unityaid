@@ -14,7 +14,7 @@ const stats = [
   <section class="page-section">
     <div class="page-heading">
       <div>
-        <p class="eyebrow">Главная страница</p>
+        <p class="eyebrow">Главная</p>
         <h1>Добро пожаловать, {{ authState.user?.firstName }}</h1>
       </div>
       <p>
@@ -28,14 +28,6 @@ const stats = [
         <span>{{ stat.label }}</span>
         <strong>{{ stat.value }}</strong>
       </article>
-    </div>
-
-    <div class="work-band">
-      <h2>Ближайшие сценарии разработки</h2>
-      <p>
-        Следующий слой: CRUD мероприятий, заявки на участие, задачи, учет времени и реальные виджеты
-        аналитики.
-      </p>
     </div>
   </section>
 </template>

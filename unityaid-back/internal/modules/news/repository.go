@@ -57,7 +57,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (News, error) {
 func (r *Repository) Create(ctx context.Context, request UpsertRequest, slug string, authorID string) (News, error) {
 	row := r.db.QueryRow(ctx, `
 		INSERT INTO news (organization_id, title, slug, summary, content_html, cover_image_url, category_id, status, author_id, scheduled_at, published_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, CASE WHEN $8 = 'published' AND $10 IS NULL THEN now() ELSE NULL END)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::timestamptz, CASE WHEN $8 = 'published' AND $10::timestamptz IS NULL THEN now() ELSE NULL END)
 		RETURNING id::text
 	`, request.OrganizationID, request.Title, slug, request.Summary, request.ContentHTML, request.CoverImageURL, request.CategoryID, normalizeStatus(request.Status), authorID, parseSQLTime(request.ScheduledAt))
 
@@ -80,9 +80,9 @@ func (r *Repository) Update(ctx context.Context, id string, request UpsertReques
 			cover_image_url = $7,
 			category_id = $8,
 			status = $9,
-			scheduled_at = $10,
+			scheduled_at = $10::timestamptz,
 			published_at = CASE
-				WHEN $9 = 'published' AND $10 IS NULL AND published_at IS NULL THEN now()
+				WHEN $9 = 'published' AND $10::timestamptz IS NULL AND published_at IS NULL THEN now()
 				WHEN $9 <> 'published' THEN NULL
 				ELSE published_at
 			END,

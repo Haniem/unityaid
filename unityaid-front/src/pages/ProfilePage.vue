@@ -1,12 +1,22 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { KeyRound } from 'lucide-vue-next'
 import { authState, changePassword } from '../entities/auth/store'
 
 const currentPassword = ref('')
 const newPassword = ref('')
 const isSubmitting = ref(false)
+const isPasswordModalOpen = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+
+function openPasswordModal() {
+  currentPassword.value = ''
+  newPassword.value = ''
+  errorMessage.value = ''
+  successMessage.value = ''
+  isPasswordModalOpen.value = true
+}
 
 async function submitPasswordChange() {
   errorMessage.value = ''
@@ -33,7 +43,10 @@ async function submitPasswordChange() {
         <p class="eyebrow">Профиль</p>
         <h1>{{ authState.user?.lastName }} {{ authState.user?.firstName }}</h1>
       </div>
-      <p>{{ authState.user?.email }}</p>
+      <button class="secondary-action" type="button" @click="openPasswordModal">
+        <KeyRound :size="18" />
+        <span>Сброс пароля</span>
+      </button>
     </div>
 
     <div class="profile-panel">
@@ -45,11 +58,7 @@ async function submitPasswordChange() {
         </div>
         <div>
           <dt>Email</dt>
-          <dd>{{ authState.user?.isEmailVerified ? 'Подтвержден' : 'Не подтвержден' }}</dd>
-        </div>
-        <div>
-          <dt>Язык</dt>
-          <dd>{{ authState.user?.locale === 'en' ? 'English' : 'Русский' }}</dd>
+          <dd>{{ authState.user?.email }} · {{ authState.user?.isEmailVerified ? 'подтвержден' : 'не подтвержден' }}</dd>
         </div>
         <div>
           <dt>Организации</dt>
@@ -58,28 +67,33 @@ async function submitPasswordChange() {
       </dl>
     </div>
 
-    <form class="profile-panel password-panel" @submit.prevent="submitPasswordChange">
-      <div>
-        <p class="eyebrow">Безопасность</p>
-        <h2>Смена пароля</h2>
-      </div>
+    <div v-if="isPasswordModalOpen" class="modal-backdrop" @click.self="isPasswordModalOpen = false">
+      <form class="modal-panel entity-form password-panel" @submit.prevent="submitPasswordChange">
+        <div>
+          <p class="eyebrow">Безопасность</p>
+          <h2>Смена пароля</h2>
+        </div>
 
-      <label>
-        <span>Текущий пароль</span>
-        <input v-model="currentPassword" type="password" autocomplete="current-password" required />
-      </label>
+        <label>
+          <span>Текущий пароль</span>
+          <input v-model="currentPassword" type="password" autocomplete="current-password" required />
+        </label>
 
-      <label>
-        <span>Новый пароль</span>
-        <input v-model="newPassword" type="password" autocomplete="new-password" minlength="8" required />
-      </label>
+        <label>
+          <span>Новый пароль</span>
+          <input v-model="newPassword" type="password" autocomplete="new-password" minlength="8" required />
+        </label>
 
-      <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
-      <p v-if="successMessage" class="form-success">{{ successMessage }}</p>
+        <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
+        <p v-if="successMessage" class="form-success">{{ successMessage }}</p>
 
-      <button class="primary-action" type="submit" :disabled="isSubmitting">
-        {{ isSubmitting ? 'Сохраняем...' : 'Обновить пароль' }}
-      </button>
-    </form>
+        <div class="form-actions">
+          <button class="secondary-action" type="button" @click="isPasswordModalOpen = false">Отмена</button>
+          <button class="primary-action" type="submit" :disabled="isSubmitting">
+            {{ isSubmitting ? 'Сохраняем...' : 'Обновить пароль' }}
+          </button>
+        </div>
+      </form>
+    </div>
   </section>
 </template>

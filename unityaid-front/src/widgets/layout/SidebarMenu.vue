@@ -1,46 +1,22 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import {
-  BadgeHelp,
-  Building2,
-  CalendarDays,
-  ChevronLeft,
-  ChevronRight,
-  Home,
-  ListTodo,
-  Network,
-  Newspaper
-} from 'lucide-vue-next'
+import { Building2, CalendarDays, Home, ListTodo, Network, Newspaper, UsersRound } from 'lucide-vue-next'
 
 defineProps<{ collapsed: boolean }>()
 defineEmits<{ toggle: [] }>()
 const route = useRoute()
 
-const sections = [
-  {
-    title: 'Основное',
-    items: [{ label: 'Главная страница', icon: Home, to: '/' }]
-  },
-  {
-    title: 'Продуктивность',
-    items: [
-      { label: 'Мои задачи', icon: ListTodo, to: '/tasks' },
-      { label: 'Мероприятия', icon: CalendarDays, to: '/calendar' }
-    ]
-  },
-  {
-    title: 'Организации',
-    items: [
-      { label: 'Организации', icon: Network, to: '/organizations' },
-      { label: 'Новости', icon: Newspaper, to: '/news' }
-    ]
-  }
+const items = [
+  { label: 'Главная', icon: Home, to: '/' },
+  { label: 'Задачи', icon: ListTodo, to: '/tasks' },
+  { label: 'События', icon: CalendarDays, to: '/calendar' },
+  { label: 'Волонтеры', icon: UsersRound, to: '/volunteers' },
+  { label: 'Организации', icon: Network, to: '/organizations' },
+  { label: 'Новости', icon: Newspaper, to: '/news' }
 ]
 
 function isActive(path: string) {
-  if (path === '/') {
-    return route.path === '/'
-  }
+  if (path === '/') return route.path === '/'
   return route.path === path || route.path.startsWith(`${path}/`)
 }
 </script>
@@ -48,32 +24,24 @@ function isActive(path: string) {
 <template>
   <aside class="sidebar">
     <div class="sidebar-brand">
-      <button class="icon-button ghost" type="button" :aria-label="collapsed ? 'Развернуть меню' : 'Скрыть меню'" @click="$emit('toggle')">
-        <ChevronRight v-if="collapsed" :size="20" />
-        <ChevronLeft v-else :size="20" />
-      </button>
-      <div v-if="!collapsed" class="logo-mark"><Building2 :size="22" /></div>
-      <strong v-if="!collapsed">UnityAid</strong>
+      <div class="logo-mark"><Building2 :size="22" /></div>
+      <div v-if="!collapsed">
+        <strong>UnityAid</strong>
+        <span>volunteer hub</span>
+      </div>
     </div>
 
-    <nav class="sidebar-nav" aria-label="Основное меню">
-      <section v-for="section in sections" :key="section.title || 'home'" class="nav-section">
-        <h2 v-if="section.title && !collapsed">{{ section.title }}</h2>
-        <RouterLink
-          v-for="item in section.items"
-          :key="item.label"
-          :to="item.to"
-          :class="['nav-link', { 'is-active': isActive(item.to) }]"
-        >
-          <component :is="item.icon" :size="18" />
-          <span v-if="!collapsed">{{ item.label }}</span>
-        </RouterLink>
-      </section>
+    <nav class="sidebar-nav compact" aria-label="Основное меню">
+      <RouterLink
+        v-for="item in items"
+        :key="item.to"
+        :to="item.to"
+        :class="['nav-link', { 'is-active': isActive(item.to) }]"
+        :title="item.label"
+      >
+        <component :is="item.icon" :size="19" />
+        <span v-if="!collapsed">{{ item.label }}</span>
+      </RouterLink>
     </nav>
-
-    <div v-if="!collapsed" class="sidebar-faq">
-      <BadgeHelp :size="18" />
-      <span>FAQ и помощь</span>
-    </div>
   </aside>
 </template>

@@ -10,9 +10,11 @@ import (
 	"unityaid-back/internal/modules/auth"
 	"unityaid-back/internal/modules/events"
 	"unityaid-back/internal/modules/files"
+	"unityaid-back/internal/modules/forms"
 	"unityaid-back/internal/modules/news"
 	"unityaid-back/internal/modules/organizations"
 	"unityaid-back/internal/modules/tasks"
+	"unityaid-back/internal/modules/users"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -50,6 +52,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 	authRepository := auth.NewRepository(deps.DB)
 	authService := auth.NewService(authRepository, deps.Config.JWTSecret, deps.Config.AppEnv != "production")
+	authorizer := auth.NewAuthorizer(authRepository)
 	authHandler := auth.NewHandler(authService)
 
 	authGroup := api.Group("/auth")
@@ -69,71 +72,98 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 	newsRepository := news.NewRepository(deps.DB)
 	newsService := news.NewService(newsRepository)
-	newsHandler := news.NewHandler(newsService, deps.Config.UploadsDir)
+	newsHandler := news.NewHandler(newsService, deps.Config.UploadsDir, authorizer)
 
 	newsGroup := api.Group("/news", authMiddleware)
 	newsGroup.GET("", newsHandler.List)
-	newsGroup.POST("", canManageContent, newsHandler.Create)
+	newsGroup.POST("", newsHandler.Create)
 	newsGroup.GET("/categories", newsHandler.ListCategories)
-	newsGroup.POST("/categories", canManageContent, newsHandler.CreateCategory)
-	newsGroup.POST("/cleanup-files", canManageContent, newsHandler.CleanupFiles)
+	newsGroup.POST("/categories", newsHandler.CreateCategory)
+	newsGroup.POST("/cleanup-files", newsHandler.CleanupFiles)
 	newsGroup.GET("/:id", newsHandler.Get)
-	newsGroup.PUT("/:id", canManageContent, newsHandler.Update)
-	newsGroup.DELETE("/:id", canManageContent, newsHandler.Delete)
+	newsGroup.PUT("/:id", newsHandler.Update)
+	newsGroup.DELETE("/:id", newsHandler.Delete)
 
 	filesHandler := files.NewHandler(deps.Config.UploadsDir)
 	filesGroup := api.Group("/files", authMiddleware)
 	filesGroup.POST("/news-images", canManageContent, filesHandler.UploadNewsImage)
+	filesGroup.POST("/organization-logos", canManageOrganizations, filesHandler.UploadOrganizationLogo)
+
+	formsRepository := forms.NewRepository(deps.DB)
+	formsService := forms.NewService(formsRepository)
+	formsHandler := forms.NewHandler(formsService, authorizer)
+	formsGroup := api.Group("/forms", authMiddleware)
+	formsGroup.GET("/:entity/create", formsHandler.CreateForm)
+	formsGroup.GET("/:entity/:id/edit", formsHandler.EditForm)
 
 	organizationsRepository := organizations.NewRepository(deps.DB)
 	organizationsService := organizations.NewService(organizationsRepository)
-	organizationsHandler := organizations.NewHandler(organizationsService)
+	organizationsHandler := organizations.NewHandler(organizationsService, authorizer)
 
 	organizationsGroup := api.Group("/organizations", authMiddleware)
 	organizationsGroup.GET("", organizationsHandler.List)
-	organizationsGroup.POST("", canManageOrganizations, organizationsHandler.Create)
+	organizationsGroup.POST("", organizationsHandler.Create)
 	organizationsGroup.GET("/:id", organizationsHandler.Get)
-	organizationsGroup.PUT("/:id", canManageOrganizations, organizationsHandler.Update)
-	organizationsGroup.DELETE("/:id", canManageOrganizations, organizationsHandler.Delete)
+	organizationsGroup.PUT("/:id", organizationsHandler.Update)
+	organizationsGroup.DELETE("/:id", organizationsHandler.Delete)
 	organizationsGroup.GET("/:id/members", organizationsHandler.ListMembers)
-	organizationsGroup.POST("/:id/members", canManageOrganizations, organizationsHandler.AddMember)
-	organizationsGroup.PATCH("/:id/members/:memberId", canManageOrganizations, organizationsHandler.UpdateMember)
-	organizationsGroup.DELETE("/:id/members/:memberId", canManageOrganizations, organizationsHandler.DeleteMember)
+	organizationsGroup.POST("/:id/members", organizationsHandler.AddMember)
+	organizationsGroup.PATCH("/:id/members/:memberId", organizationsHandler.UpdateMember)
+	organizationsGroup.DELETE("/:id/members/:memberId", organizationsHandler.DeleteMember)
+
+	usersRepository := users.NewRepository(deps.DB)
+	usersService := users.NewService(usersRepository)
+	usersHandler := users.NewHandler(usersService, authorizer)
+
+	usersGroup := api.Group("/users", authMiddleware)
+	usersGroup.GET("", canManageContent, usersHandler.ListUsers)
+	usersGroup.GET("/:id", canManageContent, usersHandler.GetUser)
+	usersGroup.PATCH("/:id", usersHandler.UpdateUser)
+
+	volunteersGroup := api.Group("/volunteers", authMiddleware)
+	volunteersGroup.GET("", usersHandler.ListVolunteers)
+	volunteersGroup.GET("/:id", usersHandler.GetVolunteer)
+	volunteersGroup.PATCH("/:id", usersHandler.UpdateVolunteer)
+
+	skillsGroup := api.Group("/skills", authMiddleware)
+	skillsGroup.GET("", usersHandler.ListSkills)
+	skillsGroup.POST("", usersHandler.CreateSkill)
+	skillsGroup.DELETE("/:id", usersHandler.DeleteSkill)
 
 	eventsRepository := events.NewRepository(deps.DB)
 	eventsService := events.NewService(eventsRepository)
-	eventsHandler := events.NewHandler(eventsService)
+	eventsHandler := events.NewHandler(eventsService, authorizer)
 
 	eventsGroup := api.Group("/events", authMiddleware)
 	eventsGroup.GET("", eventsHandler.List)
-	eventsGroup.POST("", canManageContent, eventsHandler.Create)
+	eventsGroup.POST("", eventsHandler.Create)
 	eventsGroup.GET("/:id", eventsHandler.Get)
-	eventsGroup.PUT("/:id", canManageContent, eventsHandler.Update)
-	eventsGroup.DELETE("/:id", canManageContent, eventsHandler.Delete)
+	eventsGroup.PUT("/:id", eventsHandler.Update)
+	eventsGroup.DELETE("/:id", eventsHandler.Delete)
 	eventsGroup.GET("/:id/applications", eventsHandler.ListApplications)
 	eventsGroup.POST("/:id/applications", eventsHandler.CreateApplication)
-	eventsGroup.PATCH("/:id/applications/:applicationId", canManageContent, eventsHandler.UpdateApplication)
-	eventsGroup.DELETE("/:id/applications/:applicationId", canManageContent, eventsHandler.DeleteApplication)
+	eventsGroup.PATCH("/:id/applications/:applicationId", eventsHandler.UpdateApplication)
+	eventsGroup.DELETE("/:id/applications/:applicationId", eventsHandler.DeleteApplication)
 	eventsGroup.GET("/:id/attendance", eventsHandler.ListAttendance)
-	eventsGroup.POST("/:id/attendance", canManageContent, eventsHandler.MarkAttendance)
+	eventsGroup.POST("/:id/attendance", eventsHandler.MarkAttendance)
 	eventsGroup.GET("/:id/shifts", eventsHandler.ListShifts)
-	eventsGroup.POST("/:id/shifts", canManageContent, eventsHandler.CreateShift)
+	eventsGroup.POST("/:id/shifts", eventsHandler.CreateShift)
 	eventsGroup.GET("/:id/feedback", eventsHandler.ListFeedback)
 	eventsGroup.POST("/:id/feedback", eventsHandler.CreateFeedback)
-	eventsGroup.POST("/:id/complete", canManageContent, eventsHandler.Complete)
+	eventsGroup.POST("/:id/complete", eventsHandler.Complete)
 
 	tasksRepository := tasks.NewRepository(deps.DB)
 	tasksService := tasks.NewService(tasksRepository)
-	tasksHandler := tasks.NewHandler(tasksService)
+	tasksHandler := tasks.NewHandler(tasksService, authorizer)
 
 	tasksGroup := api.Group("/tasks", authMiddleware)
 	tasksGroup.GET("", tasksHandler.List)
-	tasksGroup.POST("", canManageContent, tasksHandler.Create)
+	tasksGroup.POST("", tasksHandler.Create)
 	tasksGroup.GET("/:id", tasksHandler.Get)
-	tasksGroup.PUT("/:id", canManageContent, tasksHandler.Update)
-	tasksGroup.DELETE("/:id", canManageContent, tasksHandler.Delete)
-	tasksGroup.POST("/:id/assignments", canManageContent, tasksHandler.AddAssignment)
-	tasksGroup.DELETE("/:id/assignments/:userId", canManageContent, tasksHandler.RemoveAssignment)
+	tasksGroup.PUT("/:id", tasksHandler.Update)
+	tasksGroup.DELETE("/:id", tasksHandler.Delete)
+	tasksGroup.POST("/:id/assignments", tasksHandler.AddAssignment)
+	tasksGroup.DELETE("/:id/assignments/:userId", tasksHandler.RemoveAssignment)
 	tasksGroup.GET("/:id/comments", tasksHandler.ListComments)
 	tasksGroup.POST("/:id/comments", tasksHandler.AddComment)
 	tasksGroup.GET("/:id/attachments", tasksHandler.ListAttachments)
@@ -141,7 +171,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	tasksGroup.GET("/:id/status-history", tasksHandler.ListStatusHistory)
 	tasksGroup.GET("/:id/time-entries", tasksHandler.ListTimeEntries)
 	tasksGroup.POST("/:id/time-entries", tasksHandler.AddTimeEntry)
-	tasksGroup.POST("/:id/approve", canManageContent, tasksHandler.Approve)
+	tasksGroup.POST("/:id/approve", tasksHandler.Approve)
 
 	return router
 }

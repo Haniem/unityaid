@@ -86,15 +86,7 @@ func sanitizeHTML(value string) string {
 
 func makeSlug(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
-	replacer := strings.NewReplacer(
-		"а", "a", "б", "b", "в", "v", "г", "g", "д", "d", "е", "e", "ё", "e",
-		"ж", "zh", "з", "z", "и", "i", "й", "y", "к", "k", "л", "l", "м", "m",
-		"н", "n", "о", "o", "п", "p", "р", "r", "с", "s", "т", "t", "у", "u",
-		"ф", "f", "х", "h", "ц", "c", "ч", "ch", "ш", "sh", "щ", "sch", "ъ", "",
-		"ы", "y", "ь", "", "э", "e", "ю", "yu", "я", "ya",
-	)
-	value = replacer.Replace(value)
-	value = regexp.MustCompile(`[^a-z0-9]+`).ReplaceAllString(value, "-")
+	value = regexp.MustCompile(`[^\p{L}\p{N}]+`).ReplaceAllString(value, "-")
 	value = strings.Trim(value, "-")
 	if value == "" {
 		return "news"

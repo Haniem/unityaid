@@ -1,17 +1,25 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
-import { Pencil, Plus, Search, Trash2 } from 'lucide-vue-next'
-import { cleanupNewsFiles, deleteNews, fetchNewsCategories, fetchNewsList } from '../entities/news/api'
+import { Filter, Pencil, Plus, Search, Trash2, X } from 'lucide-vue-next'
+import { deleteNews, fetchNewsCategories, fetchNewsList } from '../entities/news/api'
 import type { NewsCategory, NewsItem } from '../entities/news/types'
+import CustomSelect from '../shared/ui/CustomSelect.vue'
 
 const items = ref<NewsItem[]>([])
 const categories = ref<NewsCategory[]>([])
 const isLoading = ref(true)
+const isFiltersOpen = ref(false)
 const errorMessage = ref('')
-const cleanupMessage = ref('')
 const search = ref('')
 const status = ref('')
 const categoryId = ref('')
+
+const statusOptions = [
+  { id: '', name: 'Все статусы' },
+  { id: 'draft', name: 'Черновики' },
+  { id: 'scheduled', name: 'Запланировано' },
+  { id: 'published', name: 'Опубликовано' }
+]
 
 async function loadNews() {
   isLoading.value = true
@@ -30,11 +38,6 @@ async function removeNews(item: NewsItem) {
   if (!confirm(`Удалить новость "${item.title}"?`)) return
   await deleteNews(item.id)
   await loadNews()
-}
-
-async function cleanupFiles() {
-  const response = await cleanupNewsFiles()
-  cleanupMessage.value = `Удалено файлов: ${response.removed}`
 }
 
 function formatDate(value?: string | null) {
@@ -56,25 +59,25 @@ onMounted(async () => {
 
 <template>
   <section class="page-section">
-    <div class="page-heading">
+    <div class="page-heading with-search">
       <div>
-        <p class="eyebrow">Моя компания</p>
+        <p class="eyebrow">Раздел</p>
         <h1>Новости</h1>
       </div>
+      <label class="search-field heading-search">
+        <Search :size="18" />
+        <input v-model="search" type="search" placeholder="Поиск новостей" />
+      </label>
+      <button class="secondary-action" type="button" @click="isFiltersOpen = true">
+        <Filter :size="18" />
+        <span>Фильтры</span>
+      </button>
       <RouterLink class="primary-action" to="/news/new">
         <Plus :size="18" />
-        <span>Создать новость</span>
+        <span>Создать</span>
       </RouterLink>
     </div>
 
-    <div class="filter-bar">
-      <label class="search-field"><Search :size="18" /><input v-model="search" type="search" placeholder="Поиск новостей" /></label>
-      <select v-model="status"><option value="">Все статусы</option><option value="draft">Черновики</option><option value="scheduled">Запланировано</option><option value="published">Опубликовано</option></select>
-      <select v-model="categoryId"><option value="">Все категории</option><option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option></select>
-      <button class="secondary-action" type="button" @click="cleanupFiles">Очистить файлы</button>
-    </div>
-
-    <p v-if="cleanupMessage" class="form-success">{{ cleanupMessage }}</p>
     <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
     <div v-if="isLoading" class="empty-state">Загрузка новостей...</div>
     <div v-else-if="items.length === 0" class="empty-state">Новостей пока нет.</div>
@@ -88,7 +91,7 @@ onMounted(async () => {
             <span class="status-pill">{{ item.status }} · {{ item.categoryName || 'без категории' }}</span>
             <h2>{{ item.title }}</h2>
             <p>{{ item.summary || 'Краткое описание пока не заполнено.' }}</p>
-            <small>{{ item.organizationName }} · {{ formatDate(item.scheduledAt || item.publishedAt || item.createdAt) }}</small>
+            <small>{{ item.organizationName || 'Без организации' }} · {{ formatDate(item.scheduledAt || item.publishedAt || item.createdAt) }}</small>
           </div>
         </RouterLink>
         <div class="card-actions">
@@ -96,6 +99,26 @@ onMounted(async () => {
           <button class="icon-button" type="button" aria-label="Удалить" @click="removeNews(item)"><Trash2 :size="17" /></button>
         </div>
       </article>
+    </div>
+
+    <div v-if="isFiltersOpen" class="drawer-backdrop" @click.self="isFiltersOpen = false">
+      <aside class="filter-drawer">
+        <div class="drawer-heading">
+          <h2>Фильтры</h2>
+          <button class="icon-button" type="button" aria-label="Закрыть" @click="isFiltersOpen = false"><X :size="18" /></button>
+        </div>
+        <label class="form-field">
+          <span class="field-label">Статус</span>
+          <CustomSelect v-model="status" :options="statusOptions" />
+        </label>
+        <label class="form-field">
+          <span class="field-label">Категория</span>
+          <CustomSelect
+            v-model="categoryId"
+            :options="[{ id: '', name: 'Все категории' }, ...categories.map((item) => ({ id: item.id, name: item.name }))]"
+          />
+        </label>
+      </aside>
     </div>
   </section>
 </template>

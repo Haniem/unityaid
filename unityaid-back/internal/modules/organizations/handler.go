@@ -4,15 +4,18 @@ import (
 	"errors"
 	"net/http"
 
+	"unityaid-back/internal/modules/auth"
+
 	"github.com/gin-gonic/gin"
 )
 
 type Handler struct {
-	service *Service
+	service    *Service
+	authorizer *auth.Authorizer
 }
 
-func NewHandler(service *Service) *Handler {
-	return &Handler{service: service}
+func NewHandler(service *Service, authorizer *auth.Authorizer) *Handler {
+	return &Handler{service: service, authorizer: authorizer}
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -46,6 +49,9 @@ func (h *Handler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
 		return
 	}
+	if !h.requireCanCreateOrganization(c) {
+		return
+	}
 	item, err := h.service.Create(c.Request.Context(), request)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not create organization"})
@@ -58,6 +64,9 @@ func (h *Handler) Update(c *gin.Context) {
 	var request UpsertRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+	if !h.requireCanManageOrganization(c, c.Param("id")) {
 		return
 	}
 	item, err := h.service.Update(c.Request.Context(), c.Param("id"), request)
@@ -73,6 +82,9 @@ func (h *Handler) Update(c *gin.Context) {
 }
 
 func (h *Handler) Delete(c *gin.Context) {
+	if !h.requireCanManageOrganization(c, c.Param("id")) {
+		return
+	}
 	if err := h.service.Delete(c.Request.Context(), c.Param("id")); err != nil {
 		if errors.Is(err, ErrNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Organization not found"})
@@ -103,6 +115,9 @@ func (h *Handler) AddMember(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
 		return
 	}
+	if !h.requireCanManageOrganization(c, c.Param("id")) {
+		return
+	}
 
 	item, err := h.service.AddMember(c.Request.Context(), c.Param("id"), request)
 	if err != nil {
@@ -125,6 +140,9 @@ func (h *Handler) UpdateMember(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
 		return
 	}
+	if !h.requireCanManageOrganization(c, c.Param("id")) {
+		return
+	}
 
 	item, err := h.service.UpdateMember(c.Request.Context(), c.Param("id"), c.Param("memberId"), request)
 	if err != nil {
@@ -139,6 +157,9 @@ func (h *Handler) UpdateMember(c *gin.Context) {
 }
 
 func (h *Handler) DeleteMember(c *gin.Context) {
+	if !h.requireCanManageOrganization(c, c.Param("id")) {
+		return
+	}
 	if err := h.service.DeleteMember(c.Request.Context(), c.Param("id"), c.Param("memberId")); err != nil {
 		if errors.Is(err, ErrMemberNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Member not found"})
@@ -148,4 +169,36 @@ func (h *Handler) DeleteMember(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+func (h *Handler) requireCanCreateOrganization(c *gin.Context) bool {
+	claims, ok := auth.GetClaims(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "Authorization is required"})
+		return false
+	}
+	allowed, err := h.authorizer.CanCreateOrganization(c.Request.Context(), claims)
+	return h.handlePermission(c, allowed, err)
+}
+
+func (h *Handler) requireCanManageOrganization(c *gin.Context, organizationID string) bool {
+	claims, ok := auth.GetClaims(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "Authorization is required"})
+		return false
+	}
+	allowed, err := h.authorizer.CanManageOrganization(c.Request.Context(), claims, organizationID)
+	return h.handlePermission(c, allowed, err)
+}
+
+func (h *Handler) handlePermission(c *gin.Context, allowed bool, err error) bool {
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not check permissions"})
+		return false
+	}
+	if !allowed {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden", "message": "Insufficient permissions"})
+		return false
+	}
+	return true
 }

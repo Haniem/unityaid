@@ -162,6 +162,64 @@ func (r *Repository) IsAccessTokenRevoked(ctx context.Context, jti string) (bool
 	return revoked, err
 }
 
+func (r *Repository) HasAnyRole(ctx context.Context, userID string, roles ...string) (bool, error) {
+	if userID == "" || len(roles) == 0 {
+		return false, nil
+	}
+
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM organization_members
+			WHERE user_id = $1
+				AND status = 'active'
+				AND role::text = ANY($2::text[])
+		)
+	`, userID, roles).Scan(&exists)
+	return exists, err
+}
+
+func (r *Repository) HasRoleInOrganization(ctx context.Context, userID string, organizationID string, roles ...string) (bool, error) {
+	if userID == "" || organizationID == "" || len(roles) == 0 {
+		return false, nil
+	}
+
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM organization_members
+			WHERE user_id = $1
+				AND organization_id = $2
+				AND status = 'active'
+				AND role::text = ANY($3::text[])
+		)
+	`, userID, organizationID, roles).Scan(&exists)
+	return exists, err
+}
+
+func (r *Repository) SharesOrganizationWithRole(ctx context.Context, actorUserID string, targetUserID string, roles ...string) (bool, error) {
+	if actorUserID == "" || targetUserID == "" || len(roles) == 0 {
+		return false, nil
+	}
+
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM organization_members actor
+			JOIN organization_members target ON target.organization_id = actor.organization_id
+			WHERE actor.user_id = $1
+				AND target.user_id = $2
+				AND actor.status = 'active'
+				AND target.status = 'active'
+				AND actor.role::text = ANY($3::text[])
+		)
+	`, actorUserID, targetUserID, roles).Scan(&exists)
+	return exists, err
+}
+
 func (r *Repository) CreateEmailVerificationToken(ctx context.Context, userID string, tokenHash string, expiresAt time.Time) error {
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO email_verification_tokens (user_id, token_hash, expires_at)

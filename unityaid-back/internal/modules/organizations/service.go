@@ -124,7 +124,7 @@ func normalizeSlug(slug string, fallback string) string {
 	if value == "" {
 		value = strings.ToLower(strings.TrimSpace(fallback))
 	}
-	value = regexp.MustCompile(`[^a-z0-9а-яё]+`).ReplaceAllString(value, "-")
+	value = regexp.MustCompile(`[^\p{L}\p{N}]+`).ReplaceAllString(value, "-")
 	value = strings.Trim(value, "-")
 	if value == "" {
 		return "organization"

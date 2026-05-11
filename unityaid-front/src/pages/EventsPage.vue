@@ -1,62 +1,39 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { Eye, MapPin, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { createEvent, deleteEvent, fetchEvents, updateEvent } from '../entities/events/api'
 import type { EventItem, EventPayload } from '../entities/events/types'
-import { fetchOrganizations } from '../entities/organizations/api'
-import type { Organization } from '../entities/organizations/types'
-import { formatDateTime, fromDatetimeLocal, toDatetimeLocal } from '../shared/date'
+import { fetchCreateForm, fetchEditForm } from '../entities/forms/api'
+import type { BackendForm, FormModel } from '../entities/forms/types'
+import DynamicForm from '../shared/ui/DynamicForm.vue'
+import { isoFromDatetimeLocal, modelFromForm, nullable, numberOrNull, stringValue } from '../shared/forms'
+import { formatDateTime } from '../shared/date'
 
 const items = ref<EventItem[]>([])
-const organizations = ref<Organization[]>([])
 const editingId = ref<string | null>(null)
 const isModalOpen = ref(false)
 const errorMessage = ref('')
-const form = reactive({
-  organizationId: '',
-  title: '',
-  description: '',
-  format: 'offline' as EventPayload['format'],
-  status: 'published' as EventPayload['status'],
-  startsAt: '',
-  endsAt: '',
-  location: '',
-  maxParticipants: ''
-})
-
-const hasOrganizations = computed(() => organizations.value.length > 0)
+const formSchema = ref<BackendForm | null>(null)
+const formModel = ref<FormModel>({})
 
 function resetForm() {
   editingId.value = null
-  form.organizationId = organizations.value[0]?.id ?? ''
-  form.title = ''
-  form.description = ''
-  form.format = 'offline'
-  form.status = 'published'
-  form.startsAt = ''
-  form.endsAt = ''
-  form.location = ''
-  form.maxParticipants = ''
+  formSchema.value = null
+  formModel.value = {}
   errorMessage.value = ''
 }
 
-function openCreateModal() {
+async function openCreateModal() {
   resetForm()
+  formSchema.value = await fetchCreateForm('events')
+  formModel.value = modelFromForm(formSchema.value)
   isModalOpen.value = true
 }
 
-function openEditModal(item: EventItem) {
+async function openEditModal(item: EventItem) {
   editingId.value = item.id
-  form.organizationId = item.organizationId
-  form.title = item.title
-  form.description = item.description
-  form.format = item.format
-  form.status = item.status
-  form.startsAt = toDatetimeLocal(item.startsAt)
-  form.endsAt = toDatetimeLocal(item.endsAt)
-  form.location = item.location ?? ''
-  form.maxParticipants = item.maxParticipants ? String(item.maxParticipants) : ''
-  errorMessage.value = ''
+  formSchema.value = await fetchEditForm('events', item.id)
+  formModel.value = modelFromForm(formSchema.value)
   isModalOpen.value = true
 }
 
@@ -67,23 +44,20 @@ function closeModal() {
 
 function payload(): EventPayload {
   return {
-    organizationId: form.organizationId,
-    title: form.title,
-    description: form.description,
-    format: form.format,
-    status: form.status,
-    startsAt: fromDatetimeLocal(form.startsAt),
-    endsAt: fromDatetimeLocal(form.endsAt),
-    location: form.location || null,
-    maxParticipants: form.maxParticipants ? Number(form.maxParticipants) : null
+    organizationId: stringValue(formModel.value.organizationId),
+    title: stringValue(formModel.value.title),
+    description: stringValue(formModel.value.description),
+    format: (stringValue(formModel.value.format) || 'offline') as EventPayload['format'],
+    status: (stringValue(formModel.value.status) || 'published') as EventPayload['status'],
+    startsAt: isoFromDatetimeLocal(formModel.value.startsAt) || '',
+    endsAt: isoFromDatetimeLocal(formModel.value.endsAt) || '',
+    location: nullable(formModel.value.location) as string | null,
+    maxParticipants: numberOrNull(formModel.value.maxParticipants)
   }
 }
 
 async function load() {
-  const [eventsResponse, organizationsResponse] = await Promise.all([fetchEvents(), fetchOrganizations()])
-  items.value = eventsResponse.items
-  organizations.value = organizationsResponse.items
-  if (!form.organizationId) resetForm()
+  items.value = (await fetchEvents()).items
 }
 
 async function submit() {
@@ -111,12 +85,12 @@ onMounted(load)
   <section class="page-section">
     <div class="page-heading">
       <div>
-        <p class="eyebrow">Продуктивность</p>
+        <p class="eyebrow">Раздел</p>
         <h1>Мероприятия</h1>
       </div>
       <button class="primary-action" type="button" @click="openCreateModal">
         <Plus :size="18" />
-        <span>Создать мероприятие</span>
+        <span>Создать</span>
       </button>
     </div>
 
@@ -142,27 +116,13 @@ onMounted(load)
 
     <div v-if="isModalOpen" class="modal-backdrop" @click.self="closeModal">
       <form class="modal-panel entity-form" @submit.prevent="submit">
-        <h2>{{ editingId ? 'Редактирование мероприятия' : 'Новое мероприятие' }}</h2>
+        <h2>{{ formSchema?.meta.title || (editingId ? 'Редактирование мероприятия' : 'Новое мероприятие') }}</h2>
         <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
-        <div v-if="!hasOrganizations" class="empty-state">Сначала создайте организацию.</div>
-        <template v-else>
-          <label><span>Организация</span><select v-model="form.organizationId"><option v-for="org in organizations" :key="org.id" :value="org.id">{{ org.name }}</option></select></label>
-          <label><span>Название</span><input v-model="form.title" required /></label>
-          <label><span>Описание</span><textarea v-model="form.description" rows="4" /></label>
-          <div class="form-columns">
-            <label><span>Формат</span><select v-model="form.format"><option value="offline">Офлайн</option><option value="online">Онлайн</option><option value="hybrid">Гибрид</option></select></label>
-            <label><span>Статус</span><select v-model="form.status"><option value="draft">Черновик</option><option value="published">Опубликовано</option><option value="completed">Завершено</option><option value="cancelled">Отменено</option></select></label>
-          </div>
-          <div class="form-columns">
-            <label><span>Начало</span><input v-model="form.startsAt" type="datetime-local" required /></label>
-            <label><span>Окончание</span><input v-model="form.endsAt" type="datetime-local" required /></label>
-          </div>
-          <div class="form-columns">
-            <label><span>Место</span><input v-model="form.location" /></label>
-            <label><span>Лимит участников</span><input v-model="form.maxParticipants" type="number" min="1" /></label>
-          </div>
-          <div class="form-actions"><button class="secondary-action" type="button" @click="closeModal">Отмена</button><button class="primary-action" type="submit">Сохранить</button></div>
-        </template>
+        <DynamicForm v-if="formSchema" v-model="formModel" :form="formSchema" />
+        <div class="form-actions">
+          <button class="secondary-action" type="button" @click="closeModal">Отмена</button>
+          <button class="primary-action" type="submit">Сохранить</button>
+        </div>
       </form>
     </div>
   </section>

@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Eye, Pencil, Plus, Search, Trash2 } from 'lucide-vue-next'
 import { createOrganization, deleteOrganization, fetchOrganizations, updateOrganization } from '../entities/organizations/api'
 import type { Organization, OrganizationPayload } from '../entities/organizations/types'
+import { fetchCreateForm, fetchEditForm } from '../entities/forms/api'
+import type { BackendForm, FormModel } from '../entities/forms/types'
+import DynamicForm from '../shared/ui/DynamicForm.vue'
+import { modelFromForm, nullable, stringValue } from '../shared/forms'
 
 const items = ref<Organization[]>([])
 const editingId = ref<string | null>(null)
@@ -10,47 +14,29 @@ const isModalOpen = ref(false)
 const errorMessage = ref('')
 const search = ref('')
 const includeDeleted = ref(false)
-const form = reactive<OrganizationPayload>({
-  name: '',
-  slug: '',
-  description: '',
-  contactEmail: '',
-  logoUrl: '',
-  websiteUrl: '',
-  phone: '',
-  address: ''
-})
+const formSchema = ref<BackendForm | null>(null)
+const formModel = ref<FormModel>({})
 
 const activeCount = computed(() => items.value.filter((item) => !item.isDeleted).length)
 
 function resetForm() {
   editingId.value = null
-  form.name = ''
-  form.slug = ''
-  form.description = ''
-  form.contactEmail = ''
-  form.logoUrl = ''
-  form.websiteUrl = ''
-  form.phone = ''
-  form.address = ''
+  formSchema.value = null
+  formModel.value = {}
   errorMessage.value = ''
 }
 
-function openCreateModal() {
+async function openCreateModal() {
   resetForm()
+  formSchema.value = await fetchCreateForm('organizations')
+  formModel.value = modelFromForm(formSchema.value)
   isModalOpen.value = true
 }
 
-function openEditModal(item: Organization) {
+async function openEditModal(item: Organization) {
   editingId.value = item.id
-  form.name = item.name
-  form.slug = item.slug
-  form.description = item.description
-  form.contactEmail = item.contactEmail ?? ''
-  form.logoUrl = item.logoUrl ?? ''
-  form.websiteUrl = item.websiteUrl ?? ''
-  form.phone = item.phone ?? ''
-  form.address = item.address ?? ''
+  formSchema.value = await fetchEditForm('organizations', item.id)
+  formModel.value = modelFromForm(formSchema.value)
   errorMessage.value = ''
   isModalOpen.value = true
 }
@@ -61,30 +47,28 @@ function closeModal() {
 }
 
 async function load() {
-  const response = await fetchOrganizations({
-    search: search.value,
-    includeDeleted: includeDeleted.value
-  })
+  const response = await fetchOrganizations({ search: search.value, includeDeleted: includeDeleted.value })
   items.value = response.items
 }
 
-function nullable(value: string | null | undefined) {
-  return value?.trim() || null
+function payload(): OrganizationPayload {
+  return {
+    name: stringValue(formModel.value.name),
+    slug: stringValue(formModel.value.slug),
+    description: stringValue(formModel.value.description),
+    contactEmail: nullable(formModel.value.contactEmail) as string | null,
+    logoUrl: nullable(formModel.value.logoUrl) as string | null,
+    websiteUrl: nullable(formModel.value.websiteUrl) as string | null,
+    phone: nullable(formModel.value.phone) as string | null,
+    address: nullable(formModel.value.address) as string | null
+  }
 }
 
 async function submit() {
   errorMessage.value = ''
-  const payload = {
-    ...form,
-    contactEmail: nullable(form.contactEmail),
-    logoUrl: nullable(form.logoUrl),
-    websiteUrl: nullable(form.websiteUrl),
-    phone: nullable(form.phone),
-    address: nullable(form.address)
-  }
   try {
-    if (editingId.value) await updateOrganization(editingId.value, payload)
-    else await createOrganization(payload)
+    if (editingId.value) await updateOrganization(editingId.value, payload())
+    else await createOrganization(payload())
     closeModal()
     await load()
   } catch (error) {
@@ -109,27 +93,24 @@ onMounted(load)
 
 <template>
   <section class="page-section">
-    <div class="page-heading">
+    <div class="page-heading with-search">
       <div>
-        <p class="eyebrow">Организации</p>
+        <p class="eyebrow">Раздел</p>
         <h1>Организации</h1>
         <p>{{ activeCount }} активных организаций</p>
       </div>
-      <button class="primary-action" type="button" @click="openCreateModal">
-        <Plus :size="18" />
-        <span>Создать организацию</span>
-      </button>
-    </div>
-
-    <div class="filter-bar">
-      <label class="search-field">
+      <label class="search-field heading-search">
         <Search :size="18" />
         <input v-model="search" type="search" placeholder="Поиск по названию, slug, описанию или email" />
       </label>
-      <label class="toggle-field">
+      <label class="archive-toggle">
         <input v-model="includeDeleted" type="checkbox" />
-        <span>Показывать архив</span>
+        <span>Архив</span>
       </label>
+      <button class="primary-action" type="button" @click="openCreateModal">
+        <Plus :size="18" />
+        <span>Создать</span>
+      </button>
     </div>
 
     <div v-if="items.length" class="directory-grid">
@@ -160,18 +141,9 @@ onMounted(load)
 
     <div v-if="isModalOpen" class="modal-backdrop" @click.self="closeModal">
       <form class="modal-panel entity-form" @submit.prevent="submit">
-        <h2>{{ editingId ? 'Редактирование организации' : 'Новая организация' }}</h2>
+        <h2>{{ formSchema?.meta.title || (editingId ? 'Редактирование организации' : 'Новая организация') }}</h2>
         <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
-        <div class="form-columns">
-          <label><span>Название</span><input v-model="form.name" required /></label>
-          <label><span>Slug</span><input v-model="form.slug" placeholder="auto или dobrye-ruki" /></label>
-          <label><span>Email</span><input v-model="form.contactEmail" type="email" /></label>
-          <label><span>Телефон</span><input v-model="form.phone" type="tel" /></label>
-          <label><span>Сайт</span><input v-model="form.websiteUrl" type="url" /></label>
-          <label><span>Логотип URL</span><input v-model="form.logoUrl" type="url" /></label>
-        </div>
-        <label><span>Адрес</span><input v-model="form.address" /></label>
-        <label><span>Описание</span><textarea v-model="form.description" rows="5" /></label>
+        <DynamicForm v-if="formSchema" v-model="formModel" :form="formSchema" />
         <div class="form-actions">
           <button class="secondary-action" type="button" @click="closeModal">Отмена</button>
           <button class="primary-action" type="submit">Сохранить</button>
