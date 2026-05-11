@@ -3,14 +3,21 @@ package events
 import (
 	"context"
 	"time"
+
+	"unityaid-back/internal/modules/notifications"
 )
 
 type Service struct {
 	repository *Repository
+	notifier   *notifications.Service
 }
 
-func NewService(repository *Repository) *Service {
-	return &Service{repository: repository}
+func NewService(repository *Repository, notifier ...*notifications.Service) *Service {
+	service := &Service{repository: repository}
+	if len(notifier) > 0 {
+		service.notifier = notifier[0]
+	}
+	return service
 }
 
 func (s *Service) List(ctx context.Context) ([]Event, error) {
@@ -54,7 +61,34 @@ func (s *Service) CreateApplication(ctx context.Context, eventID string, request
 }
 
 func (s *Service) UpdateApplicationStatus(ctx context.Context, eventID string, applicationID string, request ApplicationStatusRequest) (Application, error) {
-	return s.repository.UpdateApplicationStatus(ctx, eventID, applicationID, request.Status)
+	application, err := s.repository.UpdateApplicationStatus(ctx, eventID, applicationID, request.Status)
+	if err != nil {
+		return Application{}, err
+	}
+	if application.Status == "approved" || application.Status == "rejected" {
+		event, findErr := s.repository.FindByID(ctx, eventID)
+		title := "Заявка обновлена"
+		if application.Status == "approved" {
+			title = "Заявка подтверждена"
+		}
+		if application.Status == "rejected" {
+			title = "Заявка отклонена"
+		}
+		body := application.Status
+		if findErr == nil {
+			body = event.Title
+		}
+		s.notify(ctx, notifications.CreateRequest{
+			UserID:     application.UserID,
+			Type:       "application_" + application.Status,
+			Title:      title,
+			Body:       body,
+			Link:       "/calendar/" + eventID,
+			EntityType: "event_application",
+			EntityID:   application.ID,
+		})
+	}
+	return application, nil
 }
 
 func (s *Service) DeleteApplication(ctx context.Context, eventID string, applicationID string) error {
@@ -111,6 +145,13 @@ func (s *Service) CreateFeedback(ctx context.Context, eventID string, userID str
 
 func (s *Service) CompleteEvent(ctx context.Context, eventID string) error {
 	return s.repository.CompleteEvent(ctx, eventID)
+}
+
+func (s *Service) notify(ctx context.Context, request notifications.CreateRequest) {
+	if s.notifier == nil {
+		return
+	}
+	_ = s.notifier.Create(ctx, request)
 }
 
 func parseRange(request UpsertRequest) (time.Time, time.Time, error) {

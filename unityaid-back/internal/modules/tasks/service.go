@@ -3,14 +3,21 @@ package tasks
 import (
 	"context"
 	"time"
+
+	"unityaid-back/internal/modules/notifications"
 )
 
 type Service struct {
 	repository *Repository
+	notifier   *notifications.Service
 }
 
-func NewService(repository *Repository) *Service {
-	return &Service{repository: repository}
+func NewService(repository *Repository, notifier ...*notifications.Service) *Service {
+	service := &Service{repository: repository}
+	if len(notifier) > 0 {
+		service.notifier = notifier[0]
+	}
+	return service
 }
 
 func (s *Service) List(ctx context.Context, filters ListFilters) ([]Task, error) {
@@ -36,7 +43,12 @@ func (s *Service) Update(ctx context.Context, id string, request UpsertRequest) 
 		return Task{}, err
 	}
 	request.EventID = normalizeOptionalID(request.EventID)
-	return s.repository.Update(ctx, id, request, dueAt)
+	task, err := s.repository.Update(ctx, id, request, dueAt)
+	if err != nil {
+		return Task{}, err
+	}
+	s.notifyTaskUpdated(ctx, task)
+	return task, nil
 }
 
 func (s *Service) Delete(ctx context.Context, id string) error {
@@ -44,7 +56,20 @@ func (s *Service) Delete(ctx context.Context, id string) error {
 }
 
 func (s *Service) AddAssignment(ctx context.Context, taskID string, req AssignmentRequest) (Task, error) {
-	return s.repository.AddAssignment(ctx, taskID, req)
+	task, err := s.repository.AddAssignment(ctx, taskID, req)
+	if err != nil {
+		return Task{}, err
+	}
+	s.notify(ctx, notifications.CreateRequest{
+		UserID:     req.UserID,
+		Type:       "task_assigned",
+		Title:      "Назначена задача",
+		Body:       task.Title,
+		Link:       "/tasks/" + task.ID,
+		EntityType: "task",
+		EntityID:   task.ID,
+	})
+	return task, nil
 }
 func (s *Service) RemoveAssignment(ctx context.Context, taskID, userID string) error {
 	return s.repository.RemoveAssignment(ctx, taskID, userID)
@@ -72,6 +97,27 @@ func (s *Service) ListTimeEntries(ctx context.Context, taskID string) ([]TaskTim
 }
 func (s *Service) Approve(ctx context.Context, taskID, userID string) (Task, error) {
 	return s.repository.Approve(ctx, taskID, userID)
+}
+
+func (s *Service) notifyTaskUpdated(ctx context.Context, task Task) {
+	for _, assignee := range task.Assignees {
+		s.notify(ctx, notifications.CreateRequest{
+			UserID:     assignee.UserID,
+			Type:       "task_updated",
+			Title:      "Задача изменена",
+			Body:       task.Title,
+			Link:       "/tasks/" + task.ID,
+			EntityType: "task",
+			EntityID:   task.ID,
+		})
+	}
+}
+
+func (s *Service) notify(ctx context.Context, request notifications.CreateRequest) {
+	if s.notifier == nil {
+		return
+	}
+	_ = s.notifier.Create(ctx, request)
 }
 
 func parseOptionalTime(value *string) (*time.Time, error) {

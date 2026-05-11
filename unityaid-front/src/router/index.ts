@@ -6,12 +6,17 @@ import LoginPage from '../pages/LoginPage.vue'
 import NewsDetailPage from '../pages/NewsDetailPage.vue'
 import NewsFormPage from '../pages/NewsFormPage.vue'
 import NewsListPage from '../pages/NewsListPage.vue'
+import NotificationsPage from '../pages/NotificationsPage.vue'
 import OrganizationsPage from '../pages/OrganizationsPage.vue'
 import ProfilePage from '../pages/ProfilePage.vue'
 import EventsPage from '../pages/EventsPage.vue'
+import KnowledgeArticlePage from '../pages/KnowledgeArticlePage.vue'
+import KnowledgeBasePage from '../pages/KnowledgeBasePage.vue'
+import KnowledgeFormPage from '../pages/KnowledgeFormPage.vue'
 import TasksPage from '../pages/TasksPage.vue'
 import EventDetailPage from '../pages/EventDetailPage.vue'
 import AchievementsPage from '../pages/AchievementsPage.vue'
+import AnalyticsPage from '../pages/AnalyticsPage.vue'
 import OrganizationDetailPage from '../pages/OrganizationDetailPage.vue'
 import TaskDetailPage from '../pages/TaskDetailPage.vue'
 import TimeEntriesPage from '../pages/TimeEntriesPage.vue'
@@ -106,6 +111,41 @@ export const router = createRouter({
           path: 'achievements',
           name: 'achievements',
           component: AchievementsPage
+        },
+        {
+          path: 'notifications',
+          name: 'notifications',
+          component: NotificationsPage
+        },
+        {
+          path: 'knowledge-base',
+          name: 'knowledge-base',
+          component: KnowledgeBasePage
+        },
+        {
+          path: 'knowledge-base/new',
+          name: 'knowledge-base-new',
+          component: KnowledgeFormPage
+        },
+        {
+          path: 'knowledge-base/:id/edit',
+          name: 'knowledge-base-edit',
+          component: KnowledgeFormPage
+        },
+        {
+          path: 'knowledge-base/:id',
+          name: 'knowledge-base-detail',
+          component: KnowledgeArticlePage
+        },
+        {
+          path: 'analytics',
+          name: 'analytics',
+          component: AnalyticsPage
+        },
+        {
+          path: 'analytics/:report',
+          name: 'analytics-report',
+          component: AnalyticsPage
         },
         {
           path: 'news',

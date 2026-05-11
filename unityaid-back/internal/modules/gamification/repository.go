@@ -155,6 +155,23 @@ func (r *Repository) RecalculateAll(ctx context.Context) error {
 	return rows.Err()
 }
 
+func (r *Repository) UserIDs(ctx context.Context) ([]string, error) {
+	rows, err := r.db.Query(ctx, `SELECT id::text FROM users WHERE is_active = true`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	return items, rows.Err()
+}
+
 func (r *Repository) RecalculateUser(ctx context.Context, userID string) error {
 	_, err := r.db.Exec(ctx, `SELECT recalculate_user_gamification($1)`, userID)
 	return err

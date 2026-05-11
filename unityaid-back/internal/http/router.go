@@ -7,12 +7,16 @@ import (
 
 	"unityaid-back/internal/config"
 	"unityaid-back/internal/http/handlers"
+	"unityaid-back/internal/modules/analytics"
+	"unityaid-back/internal/modules/audit"
 	"unityaid-back/internal/modules/auth"
 	"unityaid-back/internal/modules/events"
 	"unityaid-back/internal/modules/files"
 	"unityaid-back/internal/modules/forms"
 	"unityaid-back/internal/modules/gamification"
+	"unityaid-back/internal/modules/knowledge"
 	"unityaid-back/internal/modules/news"
+	"unityaid-back/internal/modules/notifications"
 	"unityaid-back/internal/modules/organizations"
 	"unityaid-back/internal/modules/tasks"
 	"unityaid-back/internal/modules/timeentries"
@@ -56,6 +60,12 @@ func NewRouter(deps RouterDeps) http.Handler {
 	authService := auth.NewService(authRepository, deps.Config.JWTSecret, deps.Config.AppEnv != "production")
 	authorizer := auth.NewAuthorizer(authRepository)
 	authHandler := auth.NewHandler(authService)
+	authMiddleware := auth.Middleware(authService)
+	auditRepository := audit.NewRepository(deps.DB)
+	auditMiddleware := audit.Middleware(auditRepository)
+	notificationsRepository := notifications.NewRepository(deps.DB)
+	notificationsService := notifications.NewService(notificationsRepository)
+	notificationsHandler := notifications.NewHandler(notificationsService)
 
 	authGroup := api.Group("/auth")
 	authGroup.POST("/register", authHandler.Register)
@@ -64,11 +74,10 @@ func NewRouter(deps RouterDeps) http.Handler {
 	authGroup.POST("/forgot-password", authHandler.ForgotPassword)
 	authGroup.POST("/reset-password", authHandler.ResetPassword)
 	authGroup.POST("/verify-email", authHandler.VerifyEmail)
-	authGroup.POST("/logout", auth.Middleware(authService), authHandler.Logout)
-	authGroup.GET("/me", auth.Middleware(authService), authHandler.Me)
-	authGroup.POST("/change-password", auth.Middleware(authService), authHandler.ChangePassword)
+	authGroup.POST("/logout", authMiddleware, auditMiddleware, authHandler.Logout)
+	authGroup.GET("/me", authMiddleware, authHandler.Me)
+	authGroup.POST("/change-password", authMiddleware, auditMiddleware, authHandler.ChangePassword)
 
-	authMiddleware := auth.Middleware(authService)
 	canManageContent := auth.RequireRoles("super_admin", "org_admin", "coordinator")
 	canManageOrganizations := auth.RequireRoles("super_admin", "org_admin")
 
@@ -76,7 +85,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	newsService := news.NewService(newsRepository)
 	newsHandler := news.NewHandler(newsService, deps.Config.UploadsDir, authorizer)
 
-	newsGroup := api.Group("/news", authMiddleware)
+	newsGroup := api.Group("/news", authMiddleware, auditMiddleware)
 	newsGroup.GET("", newsHandler.List)
 	newsGroup.POST("", newsHandler.Create)
 	newsGroup.GET("/categories", newsHandler.ListCategories)
@@ -87,14 +96,14 @@ func NewRouter(deps RouterDeps) http.Handler {
 	newsGroup.DELETE("/:id", newsHandler.Delete)
 
 	filesHandler := files.NewHandler(deps.Config.UploadsDir)
-	filesGroup := api.Group("/files", authMiddleware)
+	filesGroup := api.Group("/files", authMiddleware, auditMiddleware)
 	filesGroup.POST("/news-images", canManageContent, filesHandler.UploadNewsImage)
 	filesGroup.POST("/organization-logos", canManageOrganizations, filesHandler.UploadOrganizationLogo)
 
 	formsRepository := forms.NewRepository(deps.DB)
 	formsService := forms.NewService(formsRepository)
 	formsHandler := forms.NewHandler(formsService, authorizer)
-	formsGroup := api.Group("/forms", authMiddleware)
+	formsGroup := api.Group("/forms", authMiddleware, auditMiddleware)
 	formsGroup.GET("/:entity/create", formsHandler.CreateForm)
 	formsGroup.GET("/:entity/:id/edit", formsHandler.EditForm)
 
@@ -102,7 +111,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	organizationsService := organizations.NewService(organizationsRepository)
 	organizationsHandler := organizations.NewHandler(organizationsService, authorizer)
 
-	organizationsGroup := api.Group("/organizations", authMiddleware)
+	organizationsGroup := api.Group("/organizations", authMiddleware, auditMiddleware)
 	organizationsGroup.GET("", organizationsHandler.List)
 	organizationsGroup.POST("", organizationsHandler.Create)
 	organizationsGroup.GET("/:id", organizationsHandler.Get)
@@ -117,7 +126,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	usersService := users.NewService(usersRepository)
 	usersHandler := users.NewHandler(usersService, authorizer)
 
-	usersGroup := api.Group("/users", authMiddleware)
+	usersGroup := api.Group("/users", authMiddleware, auditMiddleware)
 	usersGroup.GET("", canManageContent, usersHandler.ListUsers)
 	usersGroup.GET("/:id", canManageContent, usersHandler.GetUser)
 	usersGroup.PATCH("/:id", usersHandler.UpdateUser)
@@ -125,24 +134,24 @@ func NewRouter(deps RouterDeps) http.Handler {
 	usersGroup.PUT("/:id/system-roles", usersHandler.UpdateUserSystemRoles)
 	usersGroup.DELETE("/:id/system-roles/:roleId", usersHandler.DeleteUserSystemRole)
 
-	systemRolesGroup := api.Group("/system-roles", authMiddleware)
+	systemRolesGroup := api.Group("/system-roles", authMiddleware, auditMiddleware)
 	systemRolesGroup.GET("", usersHandler.ListSystemRoles)
 
-	volunteersGroup := api.Group("/volunteers", authMiddleware)
+	volunteersGroup := api.Group("/volunteers", authMiddleware, auditMiddleware)
 	volunteersGroup.GET("", usersHandler.ListVolunteers)
 	volunteersGroup.GET("/:id", usersHandler.GetVolunteer)
 	volunteersGroup.PATCH("/:id", usersHandler.UpdateVolunteer)
 
-	skillsGroup := api.Group("/skills", authMiddleware)
+	skillsGroup := api.Group("/skills", authMiddleware, auditMiddleware)
 	skillsGroup.GET("", usersHandler.ListSkills)
 	skillsGroup.POST("", usersHandler.CreateSkill)
 	skillsGroup.DELETE("/:id", usersHandler.DeleteSkill)
 
 	eventsRepository := events.NewRepository(deps.DB)
-	eventsService := events.NewService(eventsRepository)
+	eventsService := events.NewService(eventsRepository, notificationsService)
 	eventsHandler := events.NewHandler(eventsService, authorizer)
 
-	eventsGroup := api.Group("/events", authMiddleware)
+	eventsGroup := api.Group("/events", authMiddleware, auditMiddleware)
 	eventsGroup.GET("", eventsHandler.List)
 	eventsGroup.POST("", eventsHandler.Create)
 	eventsGroup.GET("/:id", eventsHandler.Get)
@@ -165,7 +174,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	timeEntriesService := timeentries.NewService(timeEntriesRepository, authorizer)
 	timeEntriesHandler := timeentries.NewHandler(timeEntriesService, authorizer)
 
-	timeEntriesGroup := api.Group("/time-entries", authMiddleware)
+	timeEntriesGroup := api.Group("/time-entries", authMiddleware, auditMiddleware)
 	timeEntriesGroup.GET("", timeEntriesHandler.List)
 	timeEntriesGroup.POST("", timeEntriesHandler.Create)
 	timeEntriesGroup.PATCH("/:id", timeEntriesHandler.Update)
@@ -173,22 +182,47 @@ func NewRouter(deps RouterDeps) http.Handler {
 	timeEntriesGroup.POST("/:id/reject", timeEntriesHandler.Reject)
 
 	gamificationRepository := gamification.NewRepository(deps.DB)
-	gamificationService := gamification.NewService(gamificationRepository)
+	gamificationService := gamification.NewService(gamificationRepository, notificationsService)
 	gamificationHandler := gamification.NewHandler(gamificationService, authorizer)
 
-	gamificationGroup := api.Group("/gamification", authMiddleware)
+	gamificationGroup := api.Group("/gamification", authMiddleware, auditMiddleware)
 	gamificationGroup.GET("/me", gamificationHandler.Me)
 	gamificationGroup.GET("/leaderboard", gamificationHandler.Leaderboard)
 
-	achievementsGroup := api.Group("/achievements", authMiddleware)
+	achievementsGroup := api.Group("/achievements", authMiddleware, auditMiddleware)
 	achievementsGroup.GET("", gamificationHandler.ListAchievements)
 	achievementsGroup.POST("/recalculate", gamificationHandler.Recalculate)
 
+	analyticsRepository := analytics.NewRepository(deps.DB)
+	analyticsService := analytics.NewService(analyticsRepository)
+	analyticsHandler := analytics.NewHandler(analyticsService)
+
+	analyticsGroup := api.Group("/analytics", authMiddleware, auditMiddleware)
+	analyticsGroup.GET("/overview", analyticsHandler.Overview)
+	analyticsGroup.GET("/volunteers", analyticsHandler.Volunteers)
+	analyticsGroup.GET("/events", analyticsHandler.Events)
+	analyticsGroup.GET("/tasks", analyticsHandler.Tasks)
+	analyticsGroup.GET("/gamification", analyticsHandler.Gamification)
+	analyticsGroup.GET("/audit", analyticsHandler.Audit)
+
+	knowledgeRepository := knowledge.NewRepository(deps.DB)
+	knowledgeService := knowledge.NewService(knowledgeRepository)
+	knowledgeHandler := knowledge.NewHandler(knowledgeService)
+
+	knowledgeGroup := api.Group("/knowledge-base", authMiddleware, auditMiddleware)
+	knowledgeGroup.GET("", knowledgeHandler.List)
+	knowledgeGroup.POST("", canManageContent, knowledgeHandler.Create)
+	knowledgeGroup.GET("/categories", knowledgeHandler.ListCategories)
+	knowledgeGroup.POST("/categories", canManageContent, knowledgeHandler.CreateCategory)
+	knowledgeGroup.GET("/:id", knowledgeHandler.Get)
+	knowledgeGroup.PUT("/:id", canManageContent, knowledgeHandler.Update)
+	knowledgeGroup.DELETE("/:id", canManageContent, knowledgeHandler.Delete)
+
 	tasksRepository := tasks.NewRepository(deps.DB)
-	tasksService := tasks.NewService(tasksRepository)
+	tasksService := tasks.NewService(tasksRepository, notificationsService)
 	tasksHandler := tasks.NewHandler(tasksService, authorizer)
 
-	tasksGroup := api.Group("/tasks", authMiddleware)
+	tasksGroup := api.Group("/tasks", authMiddleware, auditMiddleware)
 	tasksGroup.GET("", tasksHandler.List)
 	tasksGroup.POST("", tasksHandler.Create)
 	tasksGroup.GET("/:id", tasksHandler.Get)
@@ -204,6 +238,11 @@ func NewRouter(deps RouterDeps) http.Handler {
 	tasksGroup.GET("/:id/time-entries", tasksHandler.ListTimeEntries)
 	tasksGroup.POST("/:id/time-entries", tasksHandler.AddTimeEntry)
 	tasksGroup.POST("/:id/approve", tasksHandler.Approve)
+
+	notificationsGroup := api.Group("/notifications", authMiddleware, auditMiddleware)
+	notificationsGroup.GET("", notificationsHandler.List)
+	notificationsGroup.POST("/:id/read", notificationsHandler.MarkRead)
+	notificationsGroup.POST("/read-all", notificationsHandler.MarkAllRead)
 
 	return router
 }
