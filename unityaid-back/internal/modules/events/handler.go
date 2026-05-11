@@ -114,6 +114,20 @@ func (h *Handler) ListApplications(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not load applications"})
 		return
 	}
+	if !h.canManageEvent(c, c.Param("id")) {
+		claims, ok := auth.GetClaims(c)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "Authorization is required"})
+			return
+		}
+		ownItems := make([]Application, 0, 1)
+		for _, item := range items {
+			if item.UserID == claims.UserID {
+				ownItems = append(ownItems, item)
+			}
+		}
+		items = ownItems
+	}
 	c.JSON(http.StatusOK, ApplicationsResponse{Items: items})
 }
 
@@ -147,10 +161,20 @@ func (h *Handler) UpdateApplication(c *gin.Context) {
 }
 
 func (h *Handler) DeleteApplication(c *gin.Context) {
-	if !h.requireCanManageEvent(c, c.Param("id")) {
+	claims, ok := auth.GetClaims(c)
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "Authorization is required"})
 		return
 	}
-	if err := h.service.DeleteApplication(c.Request.Context(), c.Param("id"), c.Param("applicationId")); err != nil {
+	if h.canManageEvent(c, c.Param("id")) {
+		if err := h.service.DeleteApplication(c.Request.Context(), c.Param("id"), c.Param("applicationId")); err != nil {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Application not found"})
+			return
+		}
+		c.Status(http.StatusNoContent)
+		return
+	}
+	if err := h.service.DeleteOwnApplication(c.Request.Context(), c.Param("id"), c.Param("applicationId"), claims.UserID); err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Application not found"})
 		return
 	}
@@ -158,6 +182,9 @@ func (h *Handler) DeleteApplication(c *gin.Context) {
 }
 
 func (h *Handler) ListAttendance(c *gin.Context) {
+	if !h.requireCanManageEvent(c, c.Param("id")) {
+		return
+	}
 	items, err := h.service.ListAttendance(c.Request.Context(), c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not load attendance"})
@@ -178,6 +205,27 @@ func (h *Handler) MarkAttendance(c *gin.Context) {
 	item, err := h.service.MarkAttendance(c.Request.Context(), c.Param("id"), request)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Could not mark attendance"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"item": item})
+}
+
+func (h *Handler) UpdateAttendance(c *gin.Context) {
+	var request AttendanceUpdateRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+	if !h.requireCanManageEvent(c, c.Param("id")) {
+		return
+	}
+	item, err := h.service.UpdateAttendance(c.Request.Context(), c.Param("id"), c.Param("attendanceId"), request)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Attendance not found"})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Could not update attendance"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"item": item})
@@ -242,6 +290,19 @@ func (h *Handler) Complete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *Handler) canManageEvent(c *gin.Context, eventID string) bool {
+	item, err := h.service.FindByID(c.Request.Context(), eventID)
+	if err != nil {
+		return false
+	}
+	claims, ok := auth.GetClaims(c)
+	if !ok {
+		return false
+	}
+	allowed, err := h.authorizer.CanManageContent(c.Request.Context(), claims, item.OrganizationID)
+	return err == nil && allowed
 }
 
 func (h *Handler) requireCanManageEvent(c *gin.Context, eventID string) bool {

@@ -14,6 +14,7 @@ import (
 	"unityaid-back/internal/modules/news"
 	"unityaid-back/internal/modules/organizations"
 	"unityaid-back/internal/modules/tasks"
+	"unityaid-back/internal/modules/timeentries"
 	"unityaid-back/internal/modules/users"
 
 	"github.com/gin-contrib/cors"
@@ -119,6 +120,12 @@ func NewRouter(deps RouterDeps) http.Handler {
 	usersGroup.GET("", canManageContent, usersHandler.ListUsers)
 	usersGroup.GET("/:id", canManageContent, usersHandler.GetUser)
 	usersGroup.PATCH("/:id", usersHandler.UpdateUser)
+	usersGroup.GET("/:id/system-roles", usersHandler.ListUserSystemRoles)
+	usersGroup.PUT("/:id/system-roles", usersHandler.UpdateUserSystemRoles)
+	usersGroup.DELETE("/:id/system-roles/:roleId", usersHandler.DeleteUserSystemRole)
+
+	systemRolesGroup := api.Group("/system-roles", authMiddleware)
+	systemRolesGroup.GET("", usersHandler.ListSystemRoles)
 
 	volunteersGroup := api.Group("/volunteers", authMiddleware)
 	volunteersGroup.GET("", usersHandler.ListVolunteers)
@@ -146,11 +153,23 @@ func NewRouter(deps RouterDeps) http.Handler {
 	eventsGroup.DELETE("/:id/applications/:applicationId", eventsHandler.DeleteApplication)
 	eventsGroup.GET("/:id/attendance", eventsHandler.ListAttendance)
 	eventsGroup.POST("/:id/attendance", eventsHandler.MarkAttendance)
+	eventsGroup.PATCH("/:id/attendance/:attendanceId", eventsHandler.UpdateAttendance)
 	eventsGroup.GET("/:id/shifts", eventsHandler.ListShifts)
 	eventsGroup.POST("/:id/shifts", eventsHandler.CreateShift)
 	eventsGroup.GET("/:id/feedback", eventsHandler.ListFeedback)
 	eventsGroup.POST("/:id/feedback", eventsHandler.CreateFeedback)
 	eventsGroup.POST("/:id/complete", eventsHandler.Complete)
+
+	timeEntriesRepository := timeentries.NewRepository(deps.DB)
+	timeEntriesService := timeentries.NewService(timeEntriesRepository, authorizer)
+	timeEntriesHandler := timeentries.NewHandler(timeEntriesService, authorizer)
+
+	timeEntriesGroup := api.Group("/time-entries", authMiddleware)
+	timeEntriesGroup.GET("", timeEntriesHandler.List)
+	timeEntriesGroup.POST("", timeEntriesHandler.Create)
+	timeEntriesGroup.PATCH("/:id", timeEntriesHandler.Update)
+	timeEntriesGroup.POST("/:id/approve", timeEntriesHandler.Approve)
+	timeEntriesGroup.POST("/:id/reject", timeEntriesHandler.Reject)
 
 	tasksRepository := tasks.NewRepository(deps.DB)
 	tasksService := tasks.NewService(tasksRepository)

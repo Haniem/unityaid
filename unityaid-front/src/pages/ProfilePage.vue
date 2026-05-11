@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { KeyRound } from 'lucide-vue-next'
+import { computed, onMounted, ref } from 'vue'
+import { Clock3, KeyRound } from 'lucide-vue-next'
 import { authState, changePassword } from '../entities/auth/store'
+import { fetchTimeEntries } from '../entities/timeentries/api'
+import type { TimeEntry } from '../entities/timeentries/types'
 
 const currentPassword = ref('')
 const newPassword = ref('')
@@ -9,6 +11,9 @@ const isSubmitting = ref(false)
 const isPasswordModalOpen = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const approvedEntries = ref<TimeEntry[]>([])
+
+const totalApprovedHours = computed(() => approvedEntries.value.reduce((sum, item) => sum + item.hours, 0))
 
 function openPasswordModal() {
   currentPassword.value = ''
@@ -34,6 +39,14 @@ async function submitPasswordChange() {
     isSubmitting.value = false
   }
 }
+
+async function loadHours() {
+  if (!authState.user) return
+  const response = await fetchTimeEntries({ status: 'approved', userId: authState.user.id })
+  approvedEntries.value = response.items.filter((item) => item.userId === authState.user?.id)
+}
+
+onMounted(loadHours)
 </script>
 
 <template>
@@ -63,6 +76,10 @@ async function submitPasswordChange() {
         <div>
           <dt>Организации</dt>
           <dd>{{ authState.user?.organizations.map((item) => item.organizationName).join(', ') || 'Нет организаций' }}</dd>
+        </div>
+        <div>
+          <dt>Подтвержденные часы</dt>
+          <dd class="profile-hours"><Clock3 :size="16" /> {{ totalApprovedHours.toFixed(2) }} ч.</dd>
         </div>
       </dl>
     </div>

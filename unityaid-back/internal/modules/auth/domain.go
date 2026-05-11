@@ -15,8 +15,16 @@ type User struct {
 	IsActive        bool         `json:"isActive"`
 	LastLoginAt     *time.Time   `json:"lastLoginAt"`
 	Organizations   []Membership `json:"organizations"`
+	SystemRoles     []SystemRole `json:"systemRoles"`
 	PrimaryRole     string       `json:"primaryRole"`
 	OrganizationID  *string      `json:"organizationId"`
+}
+
+type SystemRole struct {
+	ID          string `json:"id"`
+	Code        string `json:"code"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 type Membership struct {

@@ -1,6 +1,6 @@
 import { apiRequest } from '../../shared/api'
 import { authState } from '../auth/store'
-import type { Skill, SkillPayload, User, VolunteerPayload, VolunteerProfile } from './types'
+import type { Skill, SkillPayload, SystemRole, User, VolunteerPayload, VolunteerProfile } from './types'
 
 const token = () => authState.token
 
@@ -50,5 +50,21 @@ export function deleteSkill(id: string) {
   return apiRequest<void>(`/skills/${id}`, {
     method: 'DELETE',
     token: token()
+  })
+}
+
+export function fetchSystemRoles() {
+  return apiRequest<{ items: SystemRole[] }>('/system-roles', { token: token() })
+}
+
+export function fetchUserSystemRoles(userId: string) {
+  return apiRequest<{ items: SystemRole[] }>(`/users/${userId}/system-roles`, { token: token() })
+}
+
+export function updateUserSystemRoles(userId: string, roleIds: string[]) {
+  return apiRequest<{ items: SystemRole[] }>(`/users/${userId}/system-roles`, {
+    method: 'PUT',
+    token: token(),
+    body: JSON.stringify({ roleIds })
   })
 }

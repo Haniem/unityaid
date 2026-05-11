@@ -61,12 +61,28 @@ func (s *Service) DeleteApplication(ctx context.Context, eventID string, applica
 	return s.repository.DeleteApplication(ctx, eventID, applicationID)
 }
 
+func (s *Service) DeleteOwnApplication(ctx context.Context, eventID string, applicationID string, userID string) error {
+	return s.repository.DeleteApplicationForUser(ctx, eventID, applicationID, userID)
+}
+
 func (s *Service) ListAttendance(ctx context.Context, eventID string) ([]Attendance, error) {
 	return s.repository.ListAttendance(ctx, eventID)
 }
 
 func (s *Service) MarkAttendance(ctx context.Context, eventID string, request AttendanceRequest) (Attendance, error) {
 	return s.repository.MarkAttendance(ctx, eventID, request)
+}
+
+func (s *Service) UpdateAttendance(ctx context.Context, eventID string, attendanceID string, request AttendanceUpdateRequest) (Attendance, error) {
+	var checkOutAt *time.Time
+	if request.CheckOutAt != nil && *request.CheckOutAt != "" {
+		parsed, err := time.Parse(time.RFC3339, *request.CheckOutAt)
+		if err != nil {
+			return Attendance{}, err
+		}
+		checkOutAt = &parsed
+	}
+	return s.repository.UpdateAttendance(ctx, eventID, attendanceID, request.Hours, checkOutAt)
 }
 
 func (s *Service) ListShifts(ctx context.Context, eventID string) ([]Shift, error) {

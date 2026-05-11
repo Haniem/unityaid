@@ -13,7 +13,9 @@ import TasksPage from '../pages/TasksPage.vue'
 import EventDetailPage from '../pages/EventDetailPage.vue'
 import OrganizationDetailPage from '../pages/OrganizationDetailPage.vue'
 import TaskDetailPage from '../pages/TaskDetailPage.vue'
+import TimeEntriesPage from '../pages/TimeEntriesPage.vue'
 import VolunteersPage from '../pages/VolunteersPage.vue'
+import SettingsPage from '../pages/SettingsPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -37,6 +39,11 @@ export const router = createRouter({
           path: 'profile',
           name: 'profile',
           component: ProfilePage
+        },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: SettingsPage
         },
         {
           path: 'organizations',
@@ -88,6 +95,11 @@ export const router = createRouter({
           path: 'tasks/:id',
           name: 'task-detail',
           component: TaskDetailPage
+        },
+        {
+          path: 'time-entries',
+          name: 'time-entries',
+          component: TimeEntriesPage
         },
         {
           path: 'news',

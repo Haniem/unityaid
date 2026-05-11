@@ -18,6 +18,15 @@ export type User = {
   primaryRole: Membership['role']
   organizationId?: string | null
   organizations: Membership[]
+  systemRoles?: SystemRole[]
+}
+
+export type SystemRole = {
+  id: string
+  code: 'system_admin' | 'system_manager' | 'support' | 'user'
+  name: string
+  description: string
+  createdAt?: string
 }
 
 export type LoginResponse = {

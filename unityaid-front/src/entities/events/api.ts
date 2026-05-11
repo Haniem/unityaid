@@ -44,11 +44,17 @@ export const createEventApplication = (id: string, payload: { userId?: string; m
 export const updateEventApplication = (id: string, applicationId: string, status: EventApplication['status']) =>
   apiRequest<{ item: EventApplication }>(`/events/${id}/applications/${applicationId}`, { method: 'PATCH', token: token(), body: JSON.stringify({ status }) })
 
+export const deleteEventApplication = (id: string, applicationId: string) =>
+  apiRequest<void>(`/events/${id}/applications/${applicationId}`, { method: 'DELETE', token: token() })
+
 export const fetchEventAttendance = (id: string) =>
   apiRequest<{ items: EventAttendance[] }>(`/events/${id}/attendance`, { token: token() })
 
 export const markEventAttendance = (id: string, payload: { userId: string; checkinCode?: string; hours?: number }) =>
   apiRequest<{ item: EventAttendance }>(`/events/${id}/attendance`, { method: 'POST', token: token(), body: JSON.stringify(payload) })
+
+export const updateEventAttendance = (id: string, attendanceId: string, payload: { hours?: number; checkOutAt?: string }) =>
+  apiRequest<{ item: EventAttendance }>(`/events/${id}/attendance/${attendanceId}`, { method: 'PATCH', token: token(), body: JSON.stringify(payload) })
 
 export const fetchEventShifts = (id: string) =>
   apiRequest<{ items: EventShift[] }>(`/events/${id}/shifts`, { token: token() })

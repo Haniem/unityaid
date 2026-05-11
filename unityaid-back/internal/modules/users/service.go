@@ -55,6 +55,11 @@ func (s *Service) UpdateVolunteer(ctx context.Context, userID string, request Up
 	request.City = normalizeOptional(request.City)
 	request.Phone = normalizeOptional(request.Phone)
 	request.Bio = strings.TrimSpace(request.Bio)
+	request.Status = strings.TrimSpace(request.Status)
+	if request.Status == "" || !contains(validVolunteerStatuses, request.Status) {
+		request.Status = "active"
+	}
+	request.Interests = strings.TrimSpace(request.Interests)
 	request.SkillIDs = uniqueTrimmed(request.SkillIDs)
 	return s.repository.UpdateVolunteer(ctx, userID, request)
 }
@@ -70,6 +75,22 @@ func (s *Service) CreateSkill(ctx context.Context, request CreateSkillRequest) (
 
 func (s *Service) DeleteSkill(ctx context.Context, id string) error {
 	return s.repository.DeleteSkill(ctx, id)
+}
+
+func (s *Service) ListSystemRoles(ctx context.Context) ([]SystemRole, error) {
+	return s.repository.ListSystemRoles(ctx)
+}
+
+func (s *Service) ListUserSystemRoles(ctx context.Context, userID string) ([]SystemRole, error) {
+	return s.repository.ListUserSystemRoles(ctx, userID)
+}
+
+func (s *Service) ReplaceUserSystemRoles(ctx context.Context, userID string, request UpdateSystemRolesRequest) ([]SystemRole, error) {
+	return s.repository.ReplaceUserSystemRoles(ctx, userID, uniqueTrimmed(request.RoleIDs))
+}
+
+func (s *Service) DeleteUserSystemRole(ctx context.Context, userID string, roleID string) error {
+	return s.repository.DeleteUserSystemRole(ctx, userID, roleID)
 }
 
 func normalizeOptional(value *string) *string {
@@ -99,3 +120,14 @@ func uniqueTrimmed(values []string) []string {
 	}
 	return result
 }
+
+func contains(items []string, value string) bool {
+	for _, item := range items {
+		if item == value {
+			return true
+		}
+	}
+	return false
+}
+
+var validVolunteerStatuses = []string{"new", "active", "unavailable", "archived"}

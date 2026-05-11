@@ -94,6 +94,11 @@ type AttendanceRequest struct {
 	Hours       float64 `json:"hours"`
 }
 
+type AttendanceUpdateRequest struct {
+	Hours      *float64 `json:"hours"`
+	CheckOutAt *string  `json:"checkOutAt"`
+}
+
 type ShiftRequest struct {
 	Title    string `json:"title" binding:"required"`
 	StartsAt string `json:"startsAt" binding:"required"`

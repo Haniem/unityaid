@@ -70,6 +70,8 @@ async function submit() {
       city: nullable(formModel.value.city) as string | null,
       phone: nullable(formModel.value.phone) as string | null,
       bio: stringValue(formModel.value.bio),
+      status: stringValue(formModel.value.status) || 'active',
+      interests: stringValue(formModel.value.interests),
       skillIds: Array.isArray(formModel.value.skillIds) ? formModel.value.skillIds : []
     })
     const index = volunteers.value.findIndex((item) => item.userId === response.item.userId)
@@ -100,6 +102,16 @@ async function removeSkill(item: Skill) {
   await deleteSkill(item.id)
   skills.value = skills.value.filter((skill) => skill.id !== item.id)
   if (skillId.value === item.id) skillId.value = ''
+}
+
+function statusLabel(status: VolunteerProfile['status']) {
+  const labels: Record<VolunteerProfile['status'], string> = {
+    new: 'Новый',
+    active: 'Активный',
+    unavailable: 'Недоступен',
+    archived: 'Архив'
+  }
+  return labels[status] || 'Активный'
 }
 
 let searchTimer: number | undefined
@@ -171,9 +183,11 @@ onMounted(load)
             <div class="volunteer-card-head">
               <img :src="item.avatarUrl ?? 'https://i.pravatar.cc/160?img=12'" alt="" />
               <span class="status-pill">{{ item.level }} уровень</span>
+              <span :class="['status-pill', `volunteer-status-${item.status}`]">{{ statusLabel(item.status) }}</span>
             </div>
             <h2>{{ item.lastName }} {{ item.firstName }}</h2>
             <p>{{ item.bio || 'Профиль пока не заполнен.' }}</p>
+            <p v-if="item.interests" class="volunteer-interests">{{ item.interests }}</p>
             <div class="skill-list">
               <span v-for="skill in item.skills" :key="skill.id">{{ skill.name }}</span>
               <span v-if="!item.skills.length">Навыки не указаны</span>

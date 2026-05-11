@@ -153,6 +153,58 @@ func (h *Handler) DeleteSkill(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
+func (h *Handler) ListSystemRoles(c *gin.Context) {
+	if !h.requireCanManageUsers(c) {
+		return
+	}
+	items, err := h.service.ListSystemRoles(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not load system roles"})
+		return
+	}
+	c.JSON(http.StatusOK, ListSystemRolesResponse{Items: items})
+}
+
+func (h *Handler) ListUserSystemRoles(c *gin.Context) {
+	if !h.requireCanManageUsers(c) {
+		return
+	}
+	items, err := h.service.ListUserSystemRoles(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not load user system roles"})
+		return
+	}
+	c.JSON(http.StatusOK, UserSystemRolesResponse{Items: items})
+}
+
+func (h *Handler) UpdateUserSystemRoles(c *gin.Context) {
+	if !h.requireCanManageUsers(c) {
+		return
+	}
+	var request UpdateSystemRolesRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+	items, err := h.service.ReplaceUserSystemRoles(c.Request.Context(), c.Param("id"), request)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Could not update system roles"})
+		return
+	}
+	c.JSON(http.StatusOK, UserSystemRolesResponse{Items: items})
+}
+
+func (h *Handler) DeleteUserSystemRole(c *gin.Context) {
+	if !h.requireCanManageUsers(c) {
+		return
+	}
+	if err := h.service.DeleteUserSystemRole(c.Request.Context(), c.Param("id"), c.Param("roleId")); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not remove system role"})
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
 func (h *Handler) requireCanManageUsers(c *gin.Context) bool {
 	claims, ok := auth.GetClaims(c)
 	if !ok {

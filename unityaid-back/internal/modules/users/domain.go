@@ -14,8 +14,17 @@ type User struct {
 	IsActive        bool         `json:"isActive"`
 	LastLoginAt     *time.Time   `json:"lastLoginAt"`
 	Organizations   []Membership `json:"organizations"`
+	SystemRoles     []SystemRole `json:"systemRoles"`
 	CreatedAt       time.Time    `json:"createdAt"`
 	UpdatedAt       time.Time    `json:"updatedAt"`
+}
+
+type SystemRole struct {
+	ID          string    `json:"id"`
+	Code        string    `json:"code"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"createdAt"`
 }
 
 type Membership struct {
@@ -37,6 +46,8 @@ type VolunteerProfile struct {
 	City          *string      `json:"city"`
 	Phone         *string      `json:"phone"`
 	Bio           string       `json:"bio"`
+	Status        string       `json:"status"`
+	Interests     string       `json:"interests"`
 	TotalHours    float64      `json:"totalHours"`
 	Points        int          `json:"points"`
 	Level         int          `json:"level"`
@@ -62,6 +73,14 @@ type ListVolunteersResponse struct {
 
 type ListSkillsResponse struct {
 	Items []Skill `json:"items"`
+}
+
+type ListSystemRolesResponse struct {
+	Items []SystemRole `json:"items"`
+}
+
+type UserSystemRolesResponse struct {
+	Items []SystemRole `json:"items"`
 }
 
 type UserFilters struct {
@@ -93,9 +112,15 @@ type UpdateVolunteerRequest struct {
 	City       *string  `json:"city"`
 	Phone      *string  `json:"phone"`
 	Bio        string   `json:"bio"`
+	Status     string   `json:"status"`
+	Interests  string   `json:"interests"`
 	SkillIDs   []string `json:"skillIds"`
 }
 
 type CreateSkillRequest struct {
 	Name string `json:"name" binding:"required,min=2"`
+}
+
+type UpdateSystemRolesRequest struct {
+	RoleIDs []string `json:"roleIds"`
 }

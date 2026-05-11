@@ -50,6 +50,9 @@ func (r *Repository) ListUsers(ctx context.Context, filters UserFilters) ([]User
 		if err := r.loadUserMemberships(ctx, &item); err != nil {
 			return nil, err
 		}
+		if err := r.loadUserSystemRoles(ctx, &item); err != nil {
+			return nil, err
+		}
 		items = append(items, item)
 	}
 	return items, rows.Err()
@@ -69,6 +72,9 @@ func (r *Repository) FindUserByID(ctx context.Context, id string) (User, error) 
 		return User{}, err
 	}
 	if err := r.loadUserMemberships(ctx, &item); err != nil {
+		return User{}, err
+	}
+	if err := r.loadUserSystemRoles(ctx, &item); err != nil {
 		return User{}, err
 	}
 	return item, nil
@@ -104,7 +110,7 @@ func (r *Repository) UpdateUser(ctx context.Context, id string, request UpdateUs
 func (r *Repository) ListVolunteers(ctx context.Context, filters VolunteerFilters) ([]VolunteerProfile, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT DISTINCT vp.id::text, u.id::text, u.email, u.first_name, u.last_name, u.patronymic, u.avatar_url,
-			vp.city, vp.phone, vp.bio, vp.total_hours::float8, vp.points, vp.level, vp.created_at, vp.updated_at
+			vp.city, vp.phone, vp.bio, vp.status::text, vp.interests, vp.total_hours::float8, vp.points, vp.level, vp.created_at, vp.updated_at
 		FROM volunteer_profiles vp
 		JOIN users u ON u.id = vp.user_id
 		LEFT JOIN volunteer_skills vs ON vs.volunteer_profile_id = vp.id
@@ -116,6 +122,7 @@ func (r *Repository) ListVolunteers(ctx context.Context, filters VolunteerFilter
 				OR u.last_name ILIKE '%' || $1 || '%'
 				OR vp.city ILIKE '%' || $1 || '%'
 				OR vp.bio ILIKE '%' || $1 || '%'
+				OR vp.interests ILIKE '%' || $1 || '%'
 			)
 			AND ($2 = '' OR vs.skill_id::text = $2)
 			AND ($3 = '' OR om.organization_id::text = $3)
@@ -143,7 +150,7 @@ func (r *Repository) ListVolunteers(ctx context.Context, filters VolunteerFilter
 func (r *Repository) FindVolunteerByUserID(ctx context.Context, userID string) (VolunteerProfile, error) {
 	item, err := scanVolunteer(r.db.QueryRow(ctx, `
 		SELECT vp.id::text, u.id::text, u.email, u.first_name, u.last_name, u.patronymic, u.avatar_url,
-			vp.city, vp.phone, vp.bio, vp.total_hours::float8, vp.points, vp.level, vp.created_at, vp.updated_at
+			vp.city, vp.phone, vp.bio, vp.status::text, vp.interests, vp.total_hours::float8, vp.points, vp.level, vp.created_at, vp.updated_at
 		FROM volunteer_profiles vp
 		JOIN users u ON u.id = vp.user_id
 		WHERE u.id = $1
@@ -181,12 +188,12 @@ func (r *Repository) UpdateVolunteer(ctx context.Context, userID string, request
 
 	var profileID string
 	err = tx.QueryRow(ctx, `
-		INSERT INTO volunteer_profiles (user_id, city, phone, bio)
-		VALUES ($1, $2, $3, $4)
+		INSERT INTO volunteer_profiles (user_id, city, phone, bio, status, interests)
+		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (user_id)
-		DO UPDATE SET city = EXCLUDED.city, phone = EXCLUDED.phone, bio = EXCLUDED.bio, updated_at = now()
+		DO UPDATE SET city = EXCLUDED.city, phone = EXCLUDED.phone, bio = EXCLUDED.bio, status = EXCLUDED.status, interests = EXCLUDED.interests, updated_at = now()
 		RETURNING id::text
-	`, userID, request.City, request.Phone, request.Bio).Scan(&profileID)
+	`, userID, request.City, request.Phone, request.Bio, request.Status, request.Interests).Scan(&profileID)
 	if err != nil {
 		return VolunteerProfile{}, err
 	}
@@ -250,6 +257,100 @@ func (r *Repository) DeleteSkill(ctx context.Context, id string) error {
 	return nil
 }
 
+func (r *Repository) ListSystemRoles(ctx context.Context) ([]SystemRole, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT id::text, code, name, description, created_at
+		FROM system_roles
+		ORDER BY
+			CASE code
+				WHEN 'system_admin' THEN 1
+				WHEN 'system_manager' THEN 2
+				WHEN 'support' THEN 3
+				ELSE 4
+			END,
+			name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []SystemRole{}
+	for rows.Next() {
+		var item SystemRole
+		if err := rows.Scan(&item.ID, &item.Code, &item.Name, &item.Description, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (r *Repository) ListUserSystemRoles(ctx context.Context, userID string) ([]SystemRole, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT sr.id::text, sr.code, sr.name, sr.description, sr.created_at
+		FROM user_system_roles usr
+		JOIN system_roles sr ON sr.id = usr.role_id
+		WHERE usr.user_id = $1
+		ORDER BY
+			CASE sr.code
+				WHEN 'system_admin' THEN 1
+				WHEN 'system_manager' THEN 2
+				WHEN 'support' THEN 3
+				ELSE 4
+			END,
+			sr.name
+	`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []SystemRole{}
+	for rows.Next() {
+		var item SystemRole
+		if err := rows.Scan(&item.ID, &item.Code, &item.Name, &item.Description, &item.CreatedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (r *Repository) ReplaceUserSystemRoles(ctx context.Context, userID string, roleIDs []string) ([]SystemRole, error) {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, "DELETE FROM user_system_roles WHERE user_id = $1", userID); err != nil {
+		return nil, err
+	}
+
+	for _, roleID := range roleIDs {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO user_system_roles (user_id, role_id)
+			SELECT $1, id
+			FROM system_roles
+			WHERE id = $2
+			ON CONFLICT DO NOTHING
+		`, userID, roleID); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return r.ListUserSystemRoles(ctx, userID)
+}
+
+func (r *Repository) DeleteUserSystemRole(ctx context.Context, userID string, roleID string) error {
+	_, err := r.db.Exec(ctx, "DELETE FROM user_system_roles WHERE user_id = $1 AND role_id = $2", userID, roleID)
+	return err
+}
+
 func (r *Repository) enrichVolunteer(ctx context.Context, item *VolunteerProfile) error {
 	skills, err := r.loadVolunteerSkills(ctx, item.ID)
 	if err != nil {
@@ -294,6 +395,15 @@ func (r *Repository) loadUserMemberships(ctx context.Context, user *User) error 
 		return err
 	}
 	user.Organizations = memberships
+	return nil
+}
+
+func (r *Repository) loadUserSystemRoles(ctx context.Context, user *User) error {
+	roles, err := r.ListUserSystemRoles(ctx, user.ID)
+	if err != nil {
+		return err
+	}
+	user.SystemRoles = roles
 	return nil
 }
 
@@ -372,6 +482,8 @@ func scanVolunteer(row scanner) (VolunteerProfile, error) {
 		&city,
 		&phone,
 		&item.Bio,
+		&item.Status,
+		&item.Interests,
 		&item.TotalHours,
 		&item.Points,
 		&item.Level,

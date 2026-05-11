@@ -73,6 +73,17 @@ func (r *Repository) DeleteApplication(ctx context.Context, eventID string, appl
 	return nil
 }
 
+func (r *Repository) DeleteApplicationForUser(ctx context.Context, eventID string, applicationID string, userID string) error {
+	tag, err := r.db.Exec(ctx, `DELETE FROM event_applications WHERE event_id = $1 AND id = $2 AND user_id = $3`, eventID, applicationID, userID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 func (r *Repository) ListAttendance(ctx context.Context, eventID string) ([]Attendance, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT ea.id::text, ea.event_id::text, ea.user_id::text, concat_ws(' ', u.last_name, u.first_name), u.email,
@@ -133,6 +144,35 @@ func (r *Repository) MarkAttendance(ctx context.Context, eventID string, req Att
 	}
 	for _, item := range items {
 		if item.ID == id {
+			return item, nil
+		}
+	}
+	return Attendance{}, ErrNotFound
+}
+
+func (r *Repository) UpdateAttendance(ctx context.Context, eventID string, attendanceID string, hours *float64, checkOutAt *time.Time) (Attendance, error) {
+	if hours != nil && *hours < 0 {
+		return Attendance{}, errors.New("hours must be non-negative")
+	}
+	tag, err := r.db.Exec(ctx, `
+		UPDATE event_attendance
+		SET hours = COALESCE($3, hours),
+			check_out_at = COALESCE($4, check_out_at),
+			updated_at = now()
+		WHERE event_id = $1 AND id = $2
+	`, eventID, attendanceID, hours, checkOutAt)
+	if err != nil {
+		return Attendance{}, err
+	}
+	if tag.RowsAffected() == 0 {
+		return Attendance{}, ErrNotFound
+	}
+	items, err := r.ListAttendance(ctx, eventID)
+	if err != nil {
+		return Attendance{}, err
+	}
+	for _, item := range items {
+		if item.ID == attendanceID {
 			return item, nil
 		}
 	}

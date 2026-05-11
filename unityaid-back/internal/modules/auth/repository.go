@@ -33,6 +33,9 @@ func (r *Repository) FindByEmail(ctx context.Context, email string) (User, error
 	if err := r.loadMemberships(ctx, &user); err != nil {
 		return User{}, err
 	}
+	if err := r.loadSystemRoles(ctx, &user); err != nil {
+		return User{}, err
+	}
 
 	return user, nil
 }
@@ -48,6 +51,9 @@ func (r *Repository) FindByID(ctx context.Context, id string) (User, error) {
 	}
 
 	if err := r.loadMemberships(ctx, &user); err != nil {
+		return User{}, err
+	}
+	if err := r.loadSystemRoles(ctx, &user); err != nil {
 		return User{}, err
 	}
 
@@ -83,6 +89,9 @@ func (r *Repository) CreateUser(ctx context.Context, request RegisterRequest, pa
 	}
 
 	if err := r.loadMemberships(ctx, &user); err != nil {
+		return User{}, err
+	}
+	if err := r.loadSystemRoles(ctx, &user); err != nil {
 		return User{}, err
 	}
 
@@ -180,6 +189,24 @@ func (r *Repository) HasAnyRole(ctx context.Context, userID string, roles ...str
 	return exists, err
 }
 
+func (r *Repository) HasSystemRole(ctx context.Context, userID string, roles ...string) (bool, error) {
+	if userID == "" || len(roles) == 0 {
+		return false, nil
+	}
+
+	var exists bool
+	err := r.db.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM user_system_roles usr
+			JOIN system_roles sr ON sr.id = usr.role_id
+			WHERE usr.user_id = $1
+				AND sr.code = ANY($2::text[])
+		)
+	`, userID, roles).Scan(&exists)
+	return exists, err
+}
+
 func (r *Repository) HasRoleInOrganization(ctx context.Context, userID string, organizationID string, roles ...string) (bool, error) {
 	if userID == "" || organizationID == "" || len(roles) == 0 {
 		return false, nil
@@ -197,6 +224,33 @@ func (r *Repository) HasRoleInOrganization(ctx context.Context, userID string, o
 		)
 	`, userID, organizationID, roles).Scan(&exists)
 	return exists, err
+}
+
+func (r *Repository) OrganizationIDsForRoles(ctx context.Context, userID string, roles ...string) ([]string, error) {
+	if userID == "" || len(roles) == 0 {
+		return []string{}, nil
+	}
+
+	rows, err := r.db.Query(ctx, `
+		SELECT organization_id::text
+		FROM organization_members
+		WHERE user_id = $1
+			AND status = 'active'
+			AND role::text = ANY($2::text[])
+	`, userID, roles)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
 }
 
 func (r *Repository) SharesOrganizationWithRole(ctx context.Context, actorUserID string, targetUserID string, roles ...string) (bool, error) {
@@ -331,4 +385,35 @@ func (r *Repository) loadMemberships(ctx context.Context, user *User) error {
 	}
 
 	return nil
+}
+
+func (r *Repository) loadSystemRoles(ctx context.Context, user *User) error {
+	rows, err := r.db.Query(ctx, `
+		SELECT sr.id::text, sr.code, sr.name, sr.description
+		FROM user_system_roles usr
+		JOIN system_roles sr ON sr.id = usr.role_id
+		WHERE usr.user_id = $1
+		ORDER BY
+			CASE sr.code
+				WHEN 'system_admin' THEN 1
+				WHEN 'system_manager' THEN 2
+				WHEN 'support' THEN 3
+				ELSE 4
+			END,
+			sr.name
+	`, user.ID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	user.SystemRoles = []SystemRole{}
+	for rows.Next() {
+		var role SystemRole
+		if err := rows.Scan(&role.ID, &role.Code, &role.Name, &role.Description); err != nil {
+			return err
+		}
+		user.SystemRoles = append(user.SystemRoles, role)
+	}
+	return rows.Err()
 }

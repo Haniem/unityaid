@@ -652,6 +652,16 @@ a {
   margin: 4px 0 0;
 }
 
+.profile-hours {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.profile-hours svg {
+  color: var(--accent);
+}
+
 .page-actions,
 .form-actions {
   display: flex;
@@ -741,6 +751,26 @@ a {
   background: var(--accent-soft);
   font-size: 0.78rem;
   font-weight: 700;
+}
+
+.volunteer-status-new {
+  color: #7a4d08;
+  background: #fff3cf;
+}
+
+.volunteer-status-active {
+  color: #0f6b4e;
+  background: #dff8ee;
+}
+
+.volunteer-status-unavailable {
+  color: #6e557c;
+  background: #f0e7f7;
+}
+
+.volunteer-status-archived {
+  color: #637083;
+  background: #edf0f4;
 }
 
 .card-actions {
@@ -1560,6 +1590,28 @@ a {
   border-radius: 8px;
 }
 
+.application-row {
+  grid-template-columns: minmax(180px, 1fr) auto minmax(150px, auto);
+  margin-top: 10px;
+}
+
+.attendance-form {
+  grid-template-columns: minmax(180px, 1fr) 120px auto;
+}
+
+.attendance-row {
+  grid-template-columns: minmax(180px, 1fr) 120px auto;
+  margin-top: 10px;
+}
+
+.attendance-row input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #dde1ec;
+  border-radius: 8px;
+}
+
 .member-row img {
   width: 42px;
   height: 42px;
@@ -1636,10 +1688,171 @@ a {
   align-items: start;
 }
 
+.settings-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.time-layout {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.time-layout > form {
+  position: sticky;
+  top: 92px;
+}
+
+.time-content {
+  display: grid;
+  gap: 18px;
+}
+
+.time-total {
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  border: 1px solid #dce5df;
+  border-radius: 8px;
+  color: #405047;
+  background: #ffffff;
+}
+
+.time-total svg {
+  color: var(--accent);
+}
+
+.time-total strong {
+  font-size: 1.35rem;
+}
+
+.time-total span {
+  color: #66708a;
+}
+
+.time-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.time-row:last-child {
+  border-bottom: 0;
+}
+
+.time-row strong,
+.time-row small {
+  display: block;
+}
+
+.time-row small {
+  margin-top: 4px;
+  color: #7a839a;
+}
+
+.time-row p {
+  margin: 8px 0 0;
+  color: #4f6075;
+  line-height: 1.5;
+}
+
+.time-row-side {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+}
+
+.compact-filter {
+  min-width: 180px;
+}
+
+.settings-users-panel {
+  position: sticky;
+  top: 92px;
+}
+
+.settings-search {
+  margin-bottom: 14px;
+}
+
+.settings-user-list,
+.system-role-list {
+  display: grid;
+  gap: 10px;
+}
+
+.settings-user-row,
+.system-role-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e4e8f0;
+  border-radius: 8px;
+  color: #172140;
+  background: #ffffff;
+}
+
+.settings-user-row {
+  justify-content: space-between;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-user-row.active,
+.settings-user-row:hover,
+.system-role-option:hover {
+  border-color: var(--accent-border);
+  background: #f7fcfa;
+}
+
+.settings-user-row strong,
+.settings-user-row small,
+.system-role-option strong,
+.system-role-option small {
+  display: block;
+}
+
+.settings-user-row small,
+.system-role-option small {
+  margin-top: 4px;
+  color: #7a839a;
+  line-height: 1.45;
+}
+
+.system-role-option {
+  align-items: flex-start;
+}
+
+.system-role-option input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+}
+
+.system-role-option span {
+  flex: 1;
+}
+
+.settings-roles-panel .form-actions {
+  margin-top: 18px;
+}
+
 .volunteer-card-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
 }
 
@@ -1648,6 +1861,11 @@ a {
   height: 54px;
   border-radius: 50%;
   object-fit: cover;
+}
+
+.volunteer-interests {
+  color: #4f6075;
+  font-size: 0.9rem;
 }
 
 .skill-list,
@@ -1752,6 +1970,8 @@ a {
   .news-grid,
   .news-card-main,
   .management-grid,
+  .settings-layout,
+  .time-layout,
   .organization-management,
   .volunteers-layout,
   .inline-member-form,

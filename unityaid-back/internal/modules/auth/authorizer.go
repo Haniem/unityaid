@@ -51,6 +51,18 @@ func (a *Authorizer) CanManageAnyContent(ctx context.Context, claims Claims) (bo
 	return a.repository.HasAnyRole(ctx, claims.UserID, "org_admin", "coordinator")
 }
 
+func (a *Authorizer) ManageableOrganizationIDs(ctx context.Context, claims Claims) ([]string, error) {
+	if ok, err := a.IsSuperAdmin(ctx, claims); ok || err != nil {
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			return nil, nil
+		}
+	}
+	return a.repository.OrganizationIDsForRoles(ctx, claims.UserID, "org_admin", "coordinator")
+}
+
 func (a *Authorizer) CanManageUsers(ctx context.Context, claims Claims) (bool, error) {
 	return a.IsSuperAdmin(ctx, claims)
 }
@@ -69,6 +81,9 @@ func (a *Authorizer) CanEditVolunteer(ctx context.Context, claims Claims, target
 }
 
 func (a *Authorizer) IsSuperAdmin(ctx context.Context, claims Claims) (bool, error) {
+	if ok, err := a.repository.HasSystemRole(ctx, claims.UserID, "system_admin"); ok || err != nil {
+		return ok, err
+	}
 	if claims.Role == "super_admin" {
 		return true, nil
 	}

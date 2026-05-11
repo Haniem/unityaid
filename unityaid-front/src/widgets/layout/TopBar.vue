@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { Bell, HelpCircle, LogOut, MessageCircle, Plus, Search, UserRound } from 'lucide-vue-next'
+import { Bell, HelpCircle, LogOut, MessageCircle, Plus, Search, Settings, UserRound } from 'lucide-vue-next'
 import { authState, logoutRemote } from '../../entities/auth/store'
 
 const router = useRouter()
@@ -46,6 +46,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', closeOutside))
         <span class="badge">57</span>
       </button>
       <button class="icon-button" type="button" aria-label="FAQ"><HelpCircle :size="19" /></button>
+      <button class="icon-button" type="button" aria-label="Настройки" @click="router.push('/settings')"><Settings :size="19" /></button>
       <button ref="avatarRef" class="avatar-button" type="button" aria-label="Меню пользователя" @click="isMenuOpen = !isMenuOpen">
         <img :src="authState.user?.avatarUrl ?? 'https://i.pravatar.cc/160?img=12'" alt="" />
       </button>

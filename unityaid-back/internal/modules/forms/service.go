@@ -192,6 +192,8 @@ func volunteerForm(action string, skills []PossibleValue) Form {
 			{Name: "Аватар", Code: "avatarUrl", Type: "url", Require: false, Value: nil, Placeholder: "https://...", Help: "Ссылка на изображение профиля."},
 			textField("Город", "city", false, 120, "Город, где волонтер чаще всего участвует."),
 			{Name: "Телефон", Code: "phone", Type: "tel", Require: false, Value: nil, Placeholder: "+7 900 000-00-00", Help: "Телефон для связи координатора."},
+			selectField("Статус", "status", true, "active", statusValues(option("new", "Новый"), option("active", "Активный"), option("unavailable", "Временно недоступен"), option("archived", "Архивный")), "Рабочий статус волонтера для координаторов и фильтрации команды."),
+			{Name: "Интересы", Code: "interests", Type: "textarea", Require: false, Value: "", Rows: 3, Help: "Направления, в которых волонтер хочет участвовать: помощь людям, экология, события, медиа."},
 			{Name: "О себе", Code: "bio", Type: "textarea", Require: false, Value: "", Rows: 5, Help: "Опыт, интересы, доступность."},
 			{Name: "Навыки", Code: "skillIds", Type: "select", Require: false, Value: []string{}, Multi: true, PossibleValues: skills, Help: "Можно выбрать несколько навыков."},
 		},

@@ -24,8 +24,17 @@ export type User = {
   isActive: boolean
   lastLoginAt?: string | null
   organizations: Membership[]
+  systemRoles: SystemRole[]
   createdAt: string
   updatedAt: string
+}
+
+export type SystemRole = {
+  id: string
+  code: 'system_admin' | 'system_manager' | 'support' | 'user'
+  name: string
+  description: string
+  createdAt: string
 }
 
 export type VolunteerProfile = {
@@ -39,6 +48,8 @@ export type VolunteerProfile = {
   city?: string | null
   phone?: string | null
   bio: string
+  status: 'new' | 'active' | 'unavailable' | 'archived'
+  interests: string
   totalHours: number
   points: number
   level: number
@@ -56,6 +67,8 @@ export type VolunteerPayload = {
   city?: string | null
   phone?: string | null
   bio: string
+  status: string
+  interests: string
   skillIds: string[]
 }
 

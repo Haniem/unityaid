@@ -209,14 +209,14 @@ func (r *Repository) taskValues(ctx context.Context, id string) (map[string]any,
 
 func (r *Repository) volunteerValues(ctx context.Context, userID string) (map[string]any, error) {
 	row := r.db.QueryRow(ctx, `
-		SELECT u.first_name, u.last_name, u.patronymic, u.avatar_url, vp.city, vp.phone, vp.bio
+		SELECT u.first_name, u.last_name, u.patronymic, u.avatar_url, vp.city, vp.phone, vp.bio, COALESCE(vp.status::text, 'active'), COALESCE(vp.interests, '')
 		FROM users u
 		LEFT JOIN volunteer_profiles vp ON vp.user_id = u.id
 		WHERE u.id = $1
 	`, userID)
-	var firstName, lastName string
+	var firstName, lastName, status, interests string
 	var patronymic, avatarURL, city, phone, bio sql.NullString
-	if err := row.Scan(&firstName, &lastName, &patronymic, &avatarURL, &city, &phone, &bio); err != nil {
+	if err := row.Scan(&firstName, &lastName, &patronymic, &avatarURL, &city, &phone, &bio, &status, &interests); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrNotFound
 		}
@@ -234,6 +234,8 @@ func (r *Repository) volunteerValues(ctx context.Context, userID string) (map[st
 		"city":       nullableString(city),
 		"phone":      nullableString(phone),
 		"bio":        nullableString(bio),
+		"status":     status,
+		"interests":  interests,
 		"skillIds":   skillIDs,
 	}, nil
 }

@@ -1,19 +1,22 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { CalendarDays, MapPin, QrCode, Users } from 'lucide-vue-next'
+import { CalendarDays, CheckCircle2, Clock3, MapPin, QrCode, Users } from 'lucide-vue-next'
+import { authState } from '../entities/auth/store'
 import {
   completeEvent,
   createEventApplication,
   createEventFeedback,
   createEventShift,
+  deleteEventApplication,
   fetchEvent,
   fetchEventApplications,
   fetchEventAttendance,
   fetchEventFeedback,
   fetchEventShifts,
   markEventAttendance,
-  updateEventApplication
+  updateEventApplication,
+  updateEventAttendance
 } from '../entities/events/api'
 import type { EventApplication, EventAttendance, EventFeedback, EventItem, EventShift } from '../entities/events/types'
 import { formatDateTime, fromDatetimeLocal } from '../shared/date'
@@ -25,36 +28,77 @@ const applications = ref<EventApplication[]>([])
 const attendance = ref<EventAttendance[]>([])
 const shifts = ref<EventShift[]>([])
 const feedback = ref<EventFeedback[]>([])
+const attendanceHours = ref<Record<string, string>>({})
 const errorMessage = ref('')
+const successMessage = ref('')
 
 const applicationMessage = ref('')
 const attendanceForm = reactive({ userId: '', hours: '' })
 const shiftForm = reactive({ title: '', startsAt: '', endsAt: '', capacity: '' })
 const feedbackForm = reactive({ rating: 5, comment: '' })
 
+const currentUserId = computed(() => authState.user?.id ?? '')
+const canManageEvent = computed(() => {
+  if (!item.value || !authState.user) return false
+  const systemAdmin = authState.user.systemRoles?.some((role) => role.code === 'system_admin') ?? false
+  const organizationRole = authState.user.organizations.some(
+    (membership) =>
+      membership.organizationId === item.value?.organizationId &&
+      ['super_admin', 'org_admin', 'coordinator'].includes(membership.role)
+  )
+  return systemAdmin || authState.user.primaryRole === 'super_admin' || organizationRole
+})
+const myApplication = computed(() => applications.value.find((app) => app.userId === currentUserId.value))
+const approvedParticipants = computed(() => applications.value.filter((app) => app.status === 'approved'))
+
+const applicationStatusLabels: Record<EventApplication['status'], string> = {
+  pending: 'На рассмотрении',
+  approved: 'Подтверждена',
+  waitlisted: 'В листе ожидания',
+  rejected: 'Отклонена',
+  cancelled: 'Отменена'
+}
+
 async function load() {
   try {
-    const [eventResponse, appsResponse, attendanceResponse, shiftsResponse, feedbackResponse] = await Promise.all([
-      fetchEvent(eventId),
+    errorMessage.value = ''
+    const eventResponse = await fetchEvent(eventId)
+    item.value = eventResponse.item
+    const [appsResponse, shiftsResponse, feedbackResponse] = await Promise.all([
       fetchEventApplications(eventId),
-      fetchEventAttendance(eventId),
       fetchEventShifts(eventId),
       fetchEventFeedback(eventId)
     ])
-    item.value = eventResponse.item
     applications.value = appsResponse.items
-    attendance.value = attendanceResponse.items
     shifts.value = shiftsResponse.items
     feedback.value = feedbackResponse.items
+    if (canManageEvent.value) {
+      const attendanceResponse = await fetchEventAttendance(eventId)
+      attendance.value = attendanceResponse.items
+      attendanceHours.value = Object.fromEntries(attendanceResponse.items.map((row) => [row.id, String(row.hours)]))
+    }
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить мероприятие'
   }
 }
 
-async function applyToEvent() {
-  await createEventApplication(eventId, { message: applicationMessage.value })
-  applicationMessage.value = ''
+async function reloadApplications() {
   applications.value = (await fetchEventApplications(eventId)).items
+}
+
+async function applyToEvent() {
+  successMessage.value = ''
+  const response = await createEventApplication(eventId, { message: applicationMessage.value })
+  applicationMessage.value = ''
+  await reloadApplications()
+  successMessage.value = `Заявка создана: ${applicationStatusLabels[response.item.status]}`
+}
+
+async function cancelApplication() {
+  if (!myApplication.value) return
+  await deleteEventApplication(eventId, myApplication.value.id)
+  await reloadApplications()
+  successMessage.value = 'Заявка отменена'
 }
 
 async function setApplicationStatus(app: EventApplication, status: EventApplication['status']) {
@@ -72,7 +116,16 @@ async function markAttendance() {
   })
   attendanceForm.userId = ''
   attendanceForm.hours = ''
-  attendance.value = (await fetchEventAttendance(eventId)).items
+  const response = await fetchEventAttendance(eventId)
+  attendance.value = response.items
+  attendanceHours.value = Object.fromEntries(response.items.map((row) => [row.id, String(row.hours)]))
+}
+
+async function saveAttendance(row: EventAttendance) {
+  const hours = Number(attendanceHours.value[row.id] || row.hours)
+  const response = await updateEventAttendance(eventId, row.id, { hours })
+  const index = attendance.value.findIndex((item) => item.id === row.id)
+  if (index >= 0) attendance.value[index] = response.item
 }
 
 async function addShift() {
@@ -120,41 +173,86 @@ onMounted(load)
         <span class="status-pill">{{ item.status }} · {{ item.format }}</span>
         <p class="detail-summary">{{ item.description || 'Описание мероприятия пока не заполнено.' }}</p>
         <div class="detail-metrics">
-          <div><CalendarDays :size="18" /><span>{{ formatDateTime(item.startsAt) }} — {{ formatDateTime(item.endsAt) }}</span></div>
+          <div><CalendarDays :size="18" /><span>{{ formatDateTime(item.startsAt) }} - {{ formatDateTime(item.endsAt) }}</span></div>
           <div><MapPin :size="18" /><span>{{ item.location || 'Место не указано' }}</span></div>
           <div><Users :size="18" /><span>Лимит: {{ item.maxParticipants || 'не указан' }}</span></div>
-          <div><QrCode :size="18" /><span>QR-код отметки: {{ item.checkinCode }}</span></div>
+          <div v-if="canManageEvent"><QrCode :size="18" /><span>Код отметки: {{ item.checkinCode }}</span></div>
         </div>
-        <button class="primary-action" type="button" @click="finishEvent">Завершить и начислить часы</button>
+        <button v-if="canManageEvent" class="primary-action" type="button" @click="finishEvent">
+          <CheckCircle2 :size="17" /> Завершить и начислить часы
+        </button>
       </div>
 
       <div class="management-grid">
         <section class="detail-panel">
-          <p class="eyebrow">Заявки</p>
-          <form class="inline-member-form" @submit.prevent="applyToEvent">
-            <input v-model="applicationMessage" placeholder="Комментарий к заявке" />
+          <p class="eyebrow">Участие</p>
+          <form v-if="!myApplication" class="settings-form" @submit.prevent="applyToEvent">
+            <textarea v-model="applicationMessage" rows="3" placeholder="Комментарий к заявке" />
             <button class="primary-action" type="submit">Подать заявку</button>
           </form>
-          <article v-for="app in applications" :key="app.id" class="member-row">
-            <div><strong>{{ app.userName }}</strong><small>{{ app.email }}</small></div>
-            <span class="status-pill">{{ app.status }}</span>
+          <div v-else class="member-row application-row">
+            <div>
+              <strong>Моя заявка</strong>
+              <small>{{ applicationStatusLabels[myApplication.status] }}</small>
+            </div>
+            <span class="status-pill">{{ myApplication.status }}</span>
+            <button class="secondary-action danger-action" type="button" @click="cancelApplication">Отменить</button>
+          </div>
+          <p v-if="successMessage" class="form-success">{{ successMessage }}</p>
+        </section>
+
+        <section v-if="canManageEvent" class="detail-panel">
+          <p class="eyebrow">Заявки координатора</p>
+          <article v-for="app in applications" :key="app.id" class="member-row application-row">
+            <div>
+              <strong>{{ app.userName }}</strong>
+              <small>{{ app.email }} · {{ app.message || 'без комментария' }}</small>
+            </div>
+            <span class="status-pill">{{ applicationStatusLabels[app.status] }}</span>
             <select :value="app.status" @change="setApplicationStatus(app, ($event.target as HTMLSelectElement).value as EventApplication['status'])">
-              <option value="pending">pending</option><option value="approved">approved</option><option value="waitlisted">waitlisted</option><option value="rejected">rejected</option>
+              <option value="pending">На рассмотрении</option>
+              <option value="approved">Подтверждена</option>
+              <option value="waitlisted">Лист ожидания</option>
+              <option value="rejected">Отклонена</option>
+              <option value="cancelled">Отменена</option>
             </select>
+          </article>
+          <p v-if="applications.length === 0" class="empty-state">Заявок пока нет.</p>
+        </section>
+
+        <section v-if="canManageEvent" class="detail-panel">
+          <p class="eyebrow">Участники</p>
+          <article v-for="app in approvedParticipants" :key="app.id" class="member-row application-row">
+            <div>
+              <strong>{{ app.userName }}</strong>
+              <small>{{ app.email }}</small>
+            </div>
+            <span class="status-pill">подтвержден</span>
+          </article>
+          <p v-if="approvedParticipants.length === 0" class="empty-state">Подтвержденных участников пока нет.</p>
+        </section>
+
+        <section v-if="canManageEvent" class="detail-panel">
+          <p class="eyebrow">Посещаемость</p>
+          <form class="inline-member-form attendance-form" @submit.prevent="markAttendance">
+            <select v-model="attendanceForm.userId">
+              <option value="">Участник</option>
+              <option v-for="app in approvedParticipants" :key="app.id" :value="app.userId">{{ app.userName }}</option>
+            </select>
+            <input v-model="attendanceForm.hours" type="number" step="0.25" min="0" placeholder="часы" />
+            <button class="primary-action" type="submit"><Clock3 :size="17" /> Отметить</button>
+          </form>
+          <article v-for="row in attendance" :key="row.id" class="member-row attendance-row">
+            <div>
+              <strong>{{ row.userName }}</strong>
+              <small>{{ row.email }}</small>
+            </div>
+            <input v-model="attendanceHours[row.id]" type="number" min="0" step="0.25" />
+            <button class="secondary-action" type="button" @click="saveAttendance(row)">Сохранить</button>
           </article>
         </section>
 
-        <section class="detail-panel">
-          <p class="eyebrow">Посещаемость</p>
-          <form class="inline-member-form" @submit.prevent="markAttendance">
-            <select v-model="attendanceForm.userId"><option value="">Участник</option><option v-for="app in applications" :key="app.id" :value="app.userId">{{ app.userName }}</option></select>
-            <input v-model="attendanceForm.hours" type="number" step="0.25" placeholder="часы" />
-            <button class="primary-action" type="submit">Отметить</button>
-          </form>
-          <p v-for="row in attendance" :key="row.id">{{ row.userName }} · {{ row.hours }} ч.</p>
-        </section>
-
-        <section class="detail-panel">
+        <section v-if="canManageEvent" class="detail-panel">
           <p class="eyebrow">Смены</p>
           <form class="settings-form" @submit.prevent="addShift">
             <input v-model="shiftForm.title" placeholder="Название смены" required />
