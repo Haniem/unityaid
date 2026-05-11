@@ -266,6 +266,9 @@ func (r *Repository) CompleteEvent(ctx context.Context, eventID string) error {
 		SET total_hours = vp.total_hours + a.hours, updated_at = now()
 		FROM event_attendance a
 		WHERE a.event_id = $1 AND a.user_id = vp.user_id;
+		SELECT recalculate_user_gamification(a.user_id)
+		FROM event_attendance a
+		WHERE a.event_id = $1;
 	`, eventID)
 	return err
 }

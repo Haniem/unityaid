@@ -11,6 +11,7 @@ import ProfilePage from '../pages/ProfilePage.vue'
 import EventsPage from '../pages/EventsPage.vue'
 import TasksPage from '../pages/TasksPage.vue'
 import EventDetailPage from '../pages/EventDetailPage.vue'
+import AchievementsPage from '../pages/AchievementsPage.vue'
 import OrganizationDetailPage from '../pages/OrganizationDetailPage.vue'
 import TaskDetailPage from '../pages/TaskDetailPage.vue'
 import TimeEntriesPage from '../pages/TimeEntriesPage.vue'
@@ -100,6 +101,11 @@ export const router = createRouter({
           path: 'time-entries',
           name: 'time-entries',
           component: TimeEntriesPage
+        },
+        {
+          path: 'achievements',
+          name: 'achievements',
+          component: AchievementsPage
         },
         {
           path: 'news',

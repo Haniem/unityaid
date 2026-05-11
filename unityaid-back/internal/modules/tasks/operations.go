@@ -137,7 +137,14 @@ func (r *Repository) ListTimeEntries(ctx context.Context, taskID string) ([]Task
 }
 
 func (r *Repository) Approve(ctx context.Context, taskID, userID string) (Task, error) {
-	_, err := r.db.Exec(ctx, `UPDATE tasks SET status = 'completed', completion_confirmed_by = $2, completion_confirmed_at = now(), updated_at = now() WHERE id = $1`, taskID, userID)
+	_, err := r.db.Exec(ctx, `
+		UPDATE tasks
+		SET status = 'completed', completion_confirmed_by = $2, completion_confirmed_at = now(), updated_at = now()
+		WHERE id = $1;
+		SELECT recalculate_user_gamification(ta.user_id)
+		FROM task_assignments ta
+		WHERE ta.task_id = $1;
+	`, taskID, userID)
 	if err != nil {
 		return Task{}, err
 	}

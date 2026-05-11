@@ -11,6 +11,7 @@ import (
 	"unityaid-back/internal/modules/events"
 	"unityaid-back/internal/modules/files"
 	"unityaid-back/internal/modules/forms"
+	"unityaid-back/internal/modules/gamification"
 	"unityaid-back/internal/modules/news"
 	"unityaid-back/internal/modules/organizations"
 	"unityaid-back/internal/modules/tasks"
@@ -170,6 +171,18 @@ func NewRouter(deps RouterDeps) http.Handler {
 	timeEntriesGroup.PATCH("/:id", timeEntriesHandler.Update)
 	timeEntriesGroup.POST("/:id/approve", timeEntriesHandler.Approve)
 	timeEntriesGroup.POST("/:id/reject", timeEntriesHandler.Reject)
+
+	gamificationRepository := gamification.NewRepository(deps.DB)
+	gamificationService := gamification.NewService(gamificationRepository)
+	gamificationHandler := gamification.NewHandler(gamificationService, authorizer)
+
+	gamificationGroup := api.Group("/gamification", authMiddleware)
+	gamificationGroup.GET("/me", gamificationHandler.Me)
+	gamificationGroup.GET("/leaderboard", gamificationHandler.Leaderboard)
+
+	achievementsGroup := api.Group("/achievements", authMiddleware)
+	achievementsGroup.GET("", gamificationHandler.ListAchievements)
+	achievementsGroup.POST("/recalculate", gamificationHandler.Recalculate)
 
 	tasksRepository := tasks.NewRepository(deps.DB)
 	tasksService := tasks.NewService(tasksRepository)

@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarDays,
   Clock3,
+  Award,
   HelpCircle,
   Home,
   ListTodo,
@@ -37,6 +38,7 @@ const navigationItems = [
   { label: 'Задачи', icon: ListTodo, to: '/tasks' },
   { label: 'События', icon: CalendarDays, to: '/calendar' },
   { label: 'Мои часы', icon: Clock3, to: '/time-entries' },
+  { label: 'Достижения', icon: Award, to: '/achievements' },
   { label: 'Волонтеры', icon: UsersRound, to: '/volunteers' },
   { label: 'Организации', icon: Network, to: '/organizations' },
   { label: 'Новости', icon: Newspaper, to: '/news' }

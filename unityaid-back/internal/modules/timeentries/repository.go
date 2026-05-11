@@ -175,6 +175,10 @@ func (r *Repository) addVolunteerHours(ctx context.Context, tx pgx.Tx, userID st
 		ON CONFLICT (user_id) DO UPDATE
 		SET total_hours = GREATEST(volunteer_profiles.total_hours + $2::numeric, 0), updated_at = now()
 	`, userID, hours)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `SELECT recalculate_user_gamification($1)`, userID)
 	return err
 }
 

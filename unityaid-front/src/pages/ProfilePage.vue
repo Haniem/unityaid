@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Clock3, KeyRound } from 'lucide-vue-next'
+import { Award, Clock3, KeyRound, Star } from 'lucide-vue-next'
 import { authState, changePassword } from '../entities/auth/store'
-import { fetchTimeEntries } from '../entities/timeentries/api'
-import type { TimeEntry } from '../entities/timeentries/types'
+import { fetchGamificationProfile } from '../entities/gamification/api'
+import type { GamificationProfile } from '../entities/gamification/types'
 
 const currentPassword = ref('')
 const newPassword = ref('')
@@ -11,9 +11,9 @@ const isSubmitting = ref(false)
 const isPasswordModalOpen = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
-const approvedEntries = ref<TimeEntry[]>([])
+const gamification = ref<GamificationProfile | null>(null)
 
-const totalApprovedHours = computed(() => approvedEntries.value.reduce((sum, item) => sum + item.hours, 0))
+const totalApprovedHours = computed(() => gamification.value?.totalHours ?? 0)
 
 function openPasswordModal() {
   currentPassword.value = ''
@@ -40,13 +40,12 @@ async function submitPasswordChange() {
   }
 }
 
-async function loadHours() {
+async function loadGamification() {
   if (!authState.user) return
-  const response = await fetchTimeEntries({ status: 'approved', userId: authState.user.id })
-  approvedEntries.value = response.items.filter((item) => item.userId === authState.user?.id)
+  gamification.value = (await fetchGamificationProfile()).item
 }
 
-onMounted(loadHours)
+onMounted(loadGamification)
 </script>
 
 <template>
@@ -81,8 +80,31 @@ onMounted(loadHours)
           <dt>Подтвержденные часы</dt>
           <dd class="profile-hours"><Clock3 :size="16" /> {{ totalApprovedHours.toFixed(2) }} ч.</dd>
         </div>
+        <div>
+          <dt>Геймификация</dt>
+          <dd class="profile-hours"><Star :size="16" /> {{ gamification?.points ?? 0 }} баллов · {{ gamification?.level ?? 1 }} уровень</dd>
+        </div>
       </dl>
     </div>
+
+    <section v-if="gamification" class="detail-panel profile-achievements-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Достижения</p>
+          <h2>Мои награды</h2>
+        </div>
+        <RouterLink class="secondary-action" to="/achievements">
+          <Award :size="17" />
+          <span>Все достижения</span>
+        </RouterLink>
+      </div>
+      <div class="profile-achievement-list">
+        <span v-for="achievement in gamification.achievements.slice(0, 4)" :key="achievement.id">
+          <Award :size="15" /> {{ achievement.name }}
+        </span>
+        <span v-if="!gamification.achievements.length">Достижения пока не получены</span>
+      </div>
+    </section>
 
     <div v-if="isPasswordModalOpen" class="modal-backdrop" @click.self="isPasswordModalOpen = false">
       <form class="modal-panel entity-form password-panel" @submit.prevent="submitPasswordChange">
