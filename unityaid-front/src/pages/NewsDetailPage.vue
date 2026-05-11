@@ -69,7 +69,11 @@ onMounted(loadNews)
         {{ item.authorName || 'Автор не указан' }} · {{ formatDate(item.publishedAt || item.createdAt) }}
       </p>
       <p v-if="item.summary" class="detail-summary">{{ item.summary }}</p>
-      <div class="rich-content" v-html="item.contentHtml"></div>
+      <div
+        class="rich-content"
+        style="overflow-wrap: anywhere; word-break: break-all; line-break: anywhere; white-space: normal;"
+        v-html="item.contentHtml"
+      ></div>
     </article>
   </section>
 </template>
