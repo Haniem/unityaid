@@ -9,6 +9,7 @@ RUN go mod download
 
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/unityaid-api ./cmd/api
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/unityaid-control-plane ./cmd/control-plane
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/unityaid-migrate ./cmd/migrate
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/unityaid-seed ./cmd/seed
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/unityaid-bootstrap-admin ./cmd/bootstrap-admin
@@ -20,6 +21,7 @@ WORKDIR /app
 RUN apk add --no-cache ca-certificates tzdata wget
 
 COPY --from=builder /out/unityaid-api /usr/local/bin/unityaid-api
+COPY --from=builder /out/unityaid-control-plane /usr/local/bin/unityaid-control-plane
 COPY --from=builder /out/unityaid-migrate /usr/local/bin/unityaid-migrate
 COPY --from=builder /out/unityaid-seed /usr/local/bin/unityaid-seed
 COPY --from=builder /out/unityaid-bootstrap-admin /usr/local/bin/unityaid-bootstrap-admin

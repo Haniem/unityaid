@@ -306,6 +306,21 @@ client-b/
 
 Цель: сделать текущий MVP готовым к запуску в нескольких независимых окружениях.
 
+Статус: **выполнено для baseline-уровня**.
+
+Реализовано:
+
+- все ключевые настройки backend вынесены в переменные окружения;
+- production backend image собирает API, миграции, сиды и bootstrap первого администратора;
+- добавлена команда `unityaid-bootstrap-admin`;
+- frontend получил production-сборку через nginx;
+- frontend умеет проксировать `/api` в backend для запуска клиента на одном домене;
+- описан production-like compose-stack клиента;
+- добавлен `.env.client.example`;
+- добавлены healthcheck для DB, backend и frontend;
+- добавлены backup и restore scripts;
+- добавлена инструкция запуска клиентского stack.
+
 ### Backend
 
 - Проверить, что все настройки берутся из переменных окружения.
@@ -392,6 +407,25 @@ client-b/
 ## 10. Этап 2. Control plane MVP
 
 Цель: создать центральную систему управления клиентскими окружениями.
+
+Статус: **готов MVP control plane**.
+
+Реализовано:
+
+- отдельная команда `unityaid-control-plane`;
+- отдельный compose-stack в `deploy/control-plane`;
+- отдельная база control plane;
+- API-key защита platform endpoints;
+- healthcheck `/health`;
+- API тарифных планов;
+- API реестра клиентов;
+- API карточки клиента;
+- API окружений клиента;
+- API истории deploy;
+- API истории backup;
+- базовые таблицы `cp_clients`, `cp_environments`, `cp_plans`, `cp_deployments`, `cp_backups`, `cp_feature_flags`;
+- документация `docs/control_plane_api.md`;
+- инструкция запуска `deploy/control-plane/README.md`.
 
 ### Минимальный функционал
 
