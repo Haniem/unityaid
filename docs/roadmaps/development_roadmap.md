@@ -997,13 +997,13 @@ GET /api/v1/certificates/verify/{code}
 
 Подготовлено:
 
-- сводка реализованного функционала по модулям: `docs/implemented_functionality.md`;
-- краткий обзор API: `docs/api_overview.md`;
-- инструкция запуска: `docs/launch_instructions.md`;
-- руководство пользователя: `docs/user_guide.md`;
-- руководство администратора: `docs/admin_guide.md`;
-- ER-диаграмма: `docs/er_diagram.md`;
-- программа и чеклист испытаний: `docs/testing_checklist.md`.
+- сводка реализованного функционала по модулям: `docs/codex/implemented_functionality.md`;
+- краткий обзор API: `docs/codex/api_overview.md`;
+- инструкция запуска: `docs/readme/launch_instructions.md`;
+- руководство пользователя: `docs/readme/user_guide.md`;
+- руководство администратора: `docs/readme/admin_guide.md`;
+- ER-диаграмма: `docs/codex/er_diagram.md`;
+- программа и чеклист испытаний: `docs/codex/testing_checklist.md`.
 
 Дополнительно добавлен внеплановый системный модуль:
 

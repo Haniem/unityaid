@@ -424,7 +424,7 @@ client-b/
 - API истории deploy;
 - API истории backup;
 - базовые таблицы `cp_clients`, `cp_environments`, `cp_plans`, `cp_deployments`, `cp_backups`, `cp_feature_flags`;
-- документация `docs/control_plane_api.md`;
+- документация `docs/codex/control_plane_api.md`;
 - инструкция запуска `deploy/control-plane/README.md`.
 
 ### Минимальный функционал

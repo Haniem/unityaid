@@ -523,7 +523,7 @@
 - Sanitization HTML для WYSIWYG-контента.
 - Audit middleware для изменяющих запросов.
 - Отчет по действиям сотрудников.
-- Документы `api_overview.md`, `launch_instructions.md`, `user_guide.md`, `admin_guide.md`, `er_diagram.md`, `testing_checklist.md`.
+- Документы `docs/codex/api_overview.md`, `docs/readme/launch_instructions.md`, `docs/readme/user_guide.md`, `docs/readme/admin_guide.md`, `docs/codex/er_diagram.md`, `docs/codex/testing_checklist.md`.
 
 ### Кейсы
 
