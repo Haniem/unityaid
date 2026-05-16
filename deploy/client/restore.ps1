@@ -21,6 +21,9 @@ $uploadsArchive = Join-Path $BackupPath "uploads.tar.gz"
 if (!(Test-Path $databaseDump)) {
   throw "database.sql not found in backup path."
 }
+if (!(Test-Path (Join-Path $BackupPath "manifest.json"))) {
+  Write-Warning "manifest.json not found in backup path. Continuing with legacy backup format."
+}
 
 $envValues = @{}
 Get-Content $envFile | ForEach-Object {
@@ -35,7 +38,8 @@ $dbUser = $envValues["POSTGRES_USER"]
 Get-Content $databaseDump | docker compose --env-file $envFile -f $composeFile exec -T db psql -U $dbUser -d $dbName
 
 if (Test-Path $uploadsArchive) {
-  Get-Content -Encoding Byte $uploadsArchive | docker compose --env-file $envFile -f $composeFile run --rm --no-deps backend sh -c "cd /app && rm -rf uploads && tar -xzf -"
+  $backupMount = (Resolve-Path -LiteralPath $BackupPath).Path -replace "\\", "/"
+  docker compose --env-file $envFile -f $composeFile run --rm --no-deps -v "${backupMount}:/restore" backend sh -c "cd /app && rm -rf uploads && tar -xzf /restore/uploads.tar.gz"
 }
 
 Write-Output "Backup restored: $BackupPath"

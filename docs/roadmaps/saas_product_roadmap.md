@@ -587,6 +587,21 @@ client-b/
 
 Цель: надежно сохранять и восстанавливать данные каждого клиента отдельно.
 
+Статус: **готов MVP для клиентских backup/restore и истории backup в control plane**.
+
+Реализовано:
+
+- `deploy/client/backup.ps1` создает PostgreSQL dump;
+- backup сохраняет архив uploads;
+- backup пишет `manifest.json` с размером, статусом, временем и автором;
+- backup пишет `env.snapshot` с редактированием секретов;
+- backup может регистрировать результат в control plane;
+- control plane хранит историю backup в `cp_backups`;
+- добавлена ручка отметки restore: `POST /api/v1/clients/{id}/backups/{backupId}/restore`;
+- `restore.ps1` поддерживает backup с manifest и legacy backup;
+- `update-client.ps1` автоматически создает pre-update backup перед реальным обновлением;
+- pre-update backup можно явно пропустить через `-SkipPreUpdateBackup`.
+
 ### Backup
 
 - PostgreSQL dump;
@@ -613,6 +628,20 @@ client-b/
 ## 15. Этап 7. Redis, workers и фоновые задачи
 
 Цель: подготовить продукт к уведомлениям, очередям и тяжелым операциям.
+
+Статус: **готов MVP для опционального Redis и отдельного worker-процесса**.
+
+Реализовано:
+
+- Redis остается опциональным compose profile;
+- добавлен compose profile `worker`;
+- включение worker автоматически включает Redis-зависимость;
+- добавлен отдельный backend binary `unityaid-worker`;
+- `Dockerfile.prod` собирает и поставляет worker binary;
+- worker запускается отдельным сервисом `worker` в клиентском stack;
+- worker имеет собственные настройки `REDIS_URL`, `WORKER_QUEUE`, `WORKER_CONCURRENCY`;
+- `provision-client.ps1 -WithWorkers` генерирует profile `redis,worker`;
+- `update-client.ps1` обновляет worker отдельно, если он включен в профилях клиента.
 
 ### Redis может понадобиться для
 

@@ -78,6 +78,7 @@ Invoke-WebRequest `
 - `POST /api/v1/clients/{id}/deployments`
 - `GET /api/v1/clients/{id}/backups`
 - `POST /api/v1/clients/{id}/backups`
+- `POST /api/v1/clients/{id}/backups/{backupId}/restore`
 
 ## Provision a client stack
 
@@ -146,4 +147,26 @@ The generated files are placed into `deploy/routing/{clientSlug}`:
   -DryRun
 ```
 
-Without `-DryRun`, the script rebuilds backend/frontend images, runs migration/bootstrap jobs, starts services, and writes a deployment entry with the final status.
+Without `-DryRun`, the script creates a pre-update backup, rebuilds backend/frontend images, runs migration/bootstrap jobs, starts services, and writes a deployment entry with the final status.
+
+To skip the automatic pre-update backup explicitly:
+
+```powershell
+.\update-client.ps1 `
+  -ClientSlug dobrye-ruki `
+  -AppVersion "2026.05.17-hotfix.1" `
+  -SkipPreUpdateBackup
+```
+
+## Backup registry
+
+Client stacks can register backup results in control plane:
+
+```powershell
+cd ..\clients\dobrye-ruki
+.\backup.ps1 `
+  -ControlPlaneApiKey "change-me-control-plane-key" `
+  -Register
+```
+
+The backup entry stores status, size, path, creator, environment and restore timestamp.

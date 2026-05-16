@@ -51,6 +51,18 @@ Redis is disabled by default. To start it with the client stack, set this in `.e
 COMPOSE_PROFILES=redis
 ```
 
+To start background workers together with Redis:
+
+```text
+COMPOSE_PROFILES=redis,worker
+```
+
+Worker settings:
+
+- `REDIS_URL`;
+- `WORKER_QUEUE`;
+- `WORKER_CONCURRENCY`.
+
 Demo seeds are not applied automatically for production client stacks. To load seed data explicitly, run:
 
 ```powershell
@@ -88,7 +100,14 @@ The script creates a timestamped folder with:
 
 - `database.sql`;
 - `uploads.tar.gz`;
-- `env.snapshot`.
+- `env.snapshot` with secrets redacted;
+- `manifest.json`.
+
+To register backup metadata in control plane:
+
+```powershell
+.\backup.ps1 -ControlPlaneApiKey "change-me-control-plane-key" -Register
+```
 
 ## Restore
 

@@ -14,6 +14,7 @@ param(
   [string]$ControlPlaneApiKey = "",
   [string]$TriggeredBy = "update-client.ps1",
   [switch]$DryRun,
+  [switch]$SkipPreUpdateBackup,
   [switch]$Register
 )
 
@@ -114,8 +115,32 @@ try {
     $status = "dry_run_succeeded"
     $log = "Dry-run config validation succeeded for $AppVersion"
   } else {
+    if (!$SkipPreUpdateBackup -and (Test-Path -LiteralPath ".\backup.ps1")) {
+      $backupArgs = @{
+        CreatedBy = "pre-update:$TriggeredBy"
+      }
+      if ($Register) {
+        $backupArgs.Register = $true
+        $backupArgs.ControlPlaneUrl = $ControlPlaneUrl
+        $backupArgs.ControlPlaneApiKey = $ControlPlaneApiKey
+        $backupArgs.ClientSlug = $ClientSlug
+        $backupArgs.EnvironmentId = $environmentId
+      }
+      & .\backup.ps1 @backupArgs
+    }
+
+    $profilesLine = Get-Content -LiteralPath $envPath | Where-Object { $_ -match "^COMPOSE_PROFILES=" } | Select-Object -First 1
+    $profilesValue = if ($profilesLine) { $profilesLine.Split("=", 2)[1] } else { "" }
+    $services = @("migrate", "bootstrap-admin", "backend", "frontend")
+    if ($profilesValue -match "(^|,)worker(,|$)") {
+      $services += "worker"
+    }
+
     docker compose --env-file .env.client -f docker-compose.client.yml build backend frontend migrate bootstrap-admin
-    docker compose --env-file .env.client -f docker-compose.client.yml up -d migrate bootstrap-admin backend frontend
+    if ($services -contains "worker") {
+      docker compose --env-file .env.client -f docker-compose.client.yml build worker
+    }
+    docker compose --env-file .env.client -f docker-compose.client.yml up -d @services
     docker compose --env-file .env.client -f docker-compose.client.yml ps
 
     $healthUrl = ((Get-Content -LiteralPath $envPath | Where-Object { $_ -match "^PUBLIC_BASE_URL=" } | Select-Object -First 1) -replace "^PUBLIC_BASE_URL=", "").TrimEnd("/")

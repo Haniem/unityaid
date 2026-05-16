@@ -76,6 +76,7 @@ func main() {
 	api.GET("/clients/:id/deployments", service.listDeployments)
 	api.POST("/clients/:id/backups", service.createBackup)
 	api.GET("/clients/:id/backups", service.listBackups)
+	api.POST("/clients/:id/backups/:backupId/restore", service.markBackupRestored)
 
 	server := &http.Server{
 		Addr:              ":" + port,
@@ -177,6 +178,9 @@ func (a *app) createClient(c *gin.Context) {
 	}
 	if request.Status == "" {
 		request.Status = "provisioning"
+	}
+	if request.Modules == nil {
+		request.Modules = []string{}
 	}
 
 	item, err := queryOne(c.Request.Context(), a.db, `
@@ -459,6 +463,24 @@ func (a *app) createBackup(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, gin.H{"item": item})
+}
+
+func (a *app) markBackupRestored(c *gin.Context) {
+	item, err := queryOne(c.Request.Context(), a.db, `
+		UPDATE cp_backups
+		SET status = 'restored', restored_at = now()
+		WHERE client_id = $1 AND id = $2
+		RETURNING id::text, client_id::text, environment_id::text, status, backup_path, size_bytes, created_by, created_at, restored_at
+	`, c.Param("id"), c.Param("backupId"))
+	if err != nil {
+		status := http.StatusInternalServerError
+		if err == pgx.ErrNoRows {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, gin.H{"error": "backup_error", "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"item": item})
 }
 
 func (a *app) loadClient(ctx context.Context, id string) (map[string]any, error) {

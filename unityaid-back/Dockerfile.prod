@@ -13,6 +13,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -o /out/unityaid-control-plane ./cmd/contr
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/unityaid-migrate ./cmd/migrate
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/unityaid-seed ./cmd/seed
 RUN CGO_ENABLED=0 GOOS=linux go build -o /out/unityaid-bootstrap-admin ./cmd/bootstrap-admin
+RUN CGO_ENABLED=0 GOOS=linux go build -o /out/unityaid-worker ./cmd/worker
 
 FROM alpine:3.22
 
@@ -25,6 +26,7 @@ COPY --from=builder /out/unityaid-control-plane /usr/local/bin/unityaid-control-
 COPY --from=builder /out/unityaid-migrate /usr/local/bin/unityaid-migrate
 COPY --from=builder /out/unityaid-seed /usr/local/bin/unityaid-seed
 COPY --from=builder /out/unityaid-bootstrap-admin /usr/local/bin/unityaid-bootstrap-admin
+COPY --from=builder /out/unityaid-worker /usr/local/bin/unityaid-worker
 COPY migrations ./migrations
 COPY seeds ./seeds
 

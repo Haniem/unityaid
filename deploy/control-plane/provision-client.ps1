@@ -32,6 +32,7 @@ param(
   [string]$ControlPlaneApiKey = "",
 
   [switch]$WithRedis,
+  [switch]$WithWorkers,
   [switch]$WithSeeds,
   [switch]$Start,
   [switch]$Register
@@ -108,6 +109,10 @@ $corsOrigin = $publicBaseUrl
 $composeProject = "unityaid_$($ClientSlug -replace '-', '_')"
 $profiles = @()
 if ($WithRedis) { $profiles += "redis" }
+if ($WithWorkers) {
+  if ($profiles -notcontains "redis") { $profiles += "redis" }
+  $profiles += "worker"
+}
 $profilesValue = $profiles -join ","
 
 $envContent = @"
@@ -132,6 +137,9 @@ POSTGRES_PASSWORD=$(New-RandomSecret 24)
 POSTGRES_DB=unityaid
 POSTGRES_PORT=$PostgresPort
 REDIS_PORT=$RedisPort
+REDIS_URL=redis://redis:6379/0
+WORKER_QUEUE=default
+WORKER_CONCURRENCY=2
 
 BACKEND_PORT=$BackendPort
 FRONTEND_PORT=$FrontendPort
