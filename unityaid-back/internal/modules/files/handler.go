@@ -3,6 +3,8 @@ package files
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -45,6 +47,11 @@ func (h *Handler) uploadImage(c *gin.Context, folder string) {
 		return
 	}
 
+	if !isAllowedImageContent(file) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_file_type", "message": "Uploaded file is not a supported image"})
+		return
+	}
+
 	dir := filepath.Join(h.uploadsDir, folder)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Не удалось подготовить папку загрузок"})
@@ -68,6 +75,25 @@ func randomHex(size int) string {
 		return "file"
 	}
 	return hex.EncodeToString(bytes)
+}
+
+func isAllowedImageContent(fileHeader *multipart.FileHeader) bool {
+	file, err := fileHeader.Open()
+	if err != nil {
+		return false
+	}
+	defer file.Close()
+	buffer := make([]byte, 512)
+	n, err := io.ReadFull(file, buffer)
+	if err != nil && err != io.ErrUnexpectedEOF {
+		return false
+	}
+	switch http.DetectContentType(buffer[:n]) {
+	case "image/jpeg", "image/png", "image/gif", "image/webp":
+		return true
+	default:
+		return false
+	}
 }
 
 func requestBaseURL(c *gin.Context) string {

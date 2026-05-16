@@ -6,8 +6,10 @@ import type { EventItem, EventPayload } from '../entities/events/types'
 import { fetchCreateForm, fetchEditForm } from '../entities/forms/api'
 import type { BackendForm, FormModel } from '../entities/forms/types'
 import DynamicForm from '../shared/ui/DynamicForm.vue'
+import PaginationBar from '../shared/ui/PaginationBar.vue'
 import { isoFromDatetimeLocal, modelFromForm, nullable, numberOrNull, stringValue } from '../shared/forms'
 import { formatDateTime } from '../shared/date'
+import { useClientPagination } from '../shared/pagination'
 
 const items = ref<EventItem[]>([])
 const editingId = ref<string | null>(null)
@@ -15,6 +17,7 @@ const isModalOpen = ref(false)
 const errorMessage = ref('')
 const formSchema = ref<BackendForm | null>(null)
 const formModel = ref<FormModel>({})
+const { page, perPage, pageItems } = useClientPagination(items, 10)
 
 function resetForm() {
   editingId.value = null
@@ -95,7 +98,7 @@ onMounted(load)
     </div>
 
     <div class="event-list">
-      <article v-for="item in items" :key="item.id" class="event-card">
+      <article v-for="item in pageItems" :key="item.id" class="event-card">
         <RouterLink class="event-card-main" :to="`/calendar/${item.id}`">
           <span class="status-pill">{{ item.status }}</span>
           <h2>{{ item.title }}</h2>
@@ -113,6 +116,7 @@ onMounted(load)
         </div>
       </article>
     </div>
+    <PaginationBar v-model:page="page" :per-page="perPage" :total="items.length" />
 
     <div v-if="isModalOpen" class="modal-backdrop" @click.self="closeModal">
       <form class="modal-panel entity-form" @submit.prevent="submit">

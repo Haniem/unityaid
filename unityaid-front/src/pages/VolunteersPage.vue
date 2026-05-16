@@ -6,7 +6,10 @@ import type { Skill, VolunteerProfile } from '../entities/users/types'
 import { fetchEditForm } from '../entities/forms/api'
 import type { BackendForm, FormModel } from '../entities/forms/types'
 import DynamicForm from '../shared/ui/DynamicForm.vue'
+import CustomSelect from '../shared/ui/CustomSelect.vue'
+import PaginationBar from '../shared/ui/PaginationBar.vue'
 import { modelFromForm, nullable, stringValue } from '../shared/forms'
+import { useClientPagination } from '../shared/pagination'
 
 const volunteers = ref<VolunteerProfile[]>([])
 const skills = ref<Skill[]>([])
@@ -21,6 +24,7 @@ const skillName = ref('')
 const skillError = ref('')
 const formSchema = ref<BackendForm | null>(null)
 const formModel = ref<FormModel>({})
+const { page, perPage, pageItems } = useClientPagination(volunteers, 12)
 
 const totalHours = computed(() => volunteers.value.reduce((sum, item) => sum + item.totalHours, 0))
 const averageLevel = computed(() => {
@@ -167,10 +171,7 @@ onMounted(load)
       </label>
       <label class="toggle-field">
         <span>Навык</span>
-        <select v-model="skillId">
-          <option value="">Все</option>
-          <option v-for="skill in skills" :key="skill.id" :value="skill.id">{{ skill.name }}</option>
-        </select>
+        <CustomSelect v-model="skillId" :options="[{ id: '', name: 'Все' }, ...skills.map((skill) => ({ id: skill.id, name: skill.name }))]" />
       </label>
     </div>
 
@@ -178,7 +179,7 @@ onMounted(load)
 
     <div v-else class="volunteers-layout">
       <div v-if="volunteers.length" class="directory-grid">
-        <article v-for="item in volunteers" :key="item.id" class="directory-card volunteer-card">
+        <article v-for="item in pageItems" :key="item.id" class="directory-card volunteer-card">
           <div class="directory-card-main">
             <div class="volunteer-card-head">
               <img :src="item.avatarUrl ?? 'https://i.pravatar.cc/160?img=12'" alt="" />
@@ -201,6 +202,7 @@ onMounted(load)
           </div>
         </article>
       </div>
+      <PaginationBar v-if="volunteers.length" v-model:page="page" :per-page="perPage" :total="volunteers.length" />
       <div v-else class="empty-state">Волонтеры не найдены.</div>
 
       <aside class="detail-panel skill-panel">

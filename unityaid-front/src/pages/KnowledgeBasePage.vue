@@ -8,6 +8,8 @@ import {
 } from '../entities/knowledge/api'
 import type { KnowledgeArticle, KnowledgeCategory } from '../entities/knowledge/types'
 import CustomSelect from '../shared/ui/CustomSelect.vue'
+import PaginationBar from '../shared/ui/PaginationBar.vue'
+import { useClientPagination } from '../shared/pagination'
 
 const items = ref<KnowledgeArticle[]>([])
 const categories = ref<KnowledgeCategory[]>([])
@@ -17,6 +19,7 @@ const errorMessage = ref('')
 const search = ref('')
 const status = ref('')
 const categoryId = ref('')
+const { page, perPage, pageItems } = useClientPagination(items, 12)
 
 const statusOptions = [
   { id: '', name: 'Все статусы' },
@@ -87,7 +90,7 @@ onMounted(async () => {
     <div v-else-if="items.length === 0" class="empty-state">Статей пока нет.</div>
 
     <div v-else class="knowledge-grid">
-      <article v-for="item in items" :key="item.id" class="knowledge-card">
+      <article v-for="item in pageItems" :key="item.id" class="knowledge-card">
         <RouterLink :to="`/knowledge-base/${item.id}`" class="knowledge-card-main">
           <span class="knowledge-card-icon"><BookOpen :size="22" /></span>
           <div>
@@ -103,6 +106,7 @@ onMounted(async () => {
         </div>
       </article>
     </div>
+    <PaginationBar v-if="!isLoading" v-model:page="page" :per-page="perPage" :total="items.length" />
 
     <div v-if="isFiltersOpen" class="drawer-backdrop" @click.self="isFiltersOpen = false">
       <aside class="filter-drawer">

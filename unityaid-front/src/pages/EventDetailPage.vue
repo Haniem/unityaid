@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
-import { CalendarDays, CheckCircle2, Clock3, MapPin, QrCode, Users } from 'lucide-vue-next'
+import { CalendarDays, CheckCircle2, Clock3, MapPin, QrCode, Star, Users } from 'lucide-vue-next'
 import { authState } from '../entities/auth/store'
 import {
   completeEvent,
@@ -20,6 +20,9 @@ import {
 } from '../entities/events/api'
 import type { EventApplication, EventAttendance, EventFeedback, EventItem, EventShift } from '../entities/events/types'
 import { formatDateTime, fromDatetimeLocal } from '../shared/date'
+import CustomSelect from '../shared/ui/CustomSelect.vue'
+import PaginationBar from '../shared/ui/PaginationBar.vue'
+import { useClientPagination } from '../shared/pagination'
 
 const route = useRoute()
 const eventId = String(route.params.id)
@@ -28,6 +31,8 @@ const applications = ref<EventApplication[]>([])
 const attendance = ref<EventAttendance[]>([])
 const shifts = ref<EventShift[]>([])
 const feedback = ref<EventFeedback[]>([])
+const feedbackAverage = ref(0)
+const feedbackCount = ref(0)
 const attendanceHours = ref<Record<string, string>>({})
 const errorMessage = ref('')
 const successMessage = ref('')
@@ -36,6 +41,15 @@ const applicationMessage = ref('')
 const attendanceForm = reactive({ userId: '', hours: '' })
 const shiftForm = reactive({ title: '', startsAt: '', endsAt: '', capacity: '' })
 const feedbackForm = reactive({ rating: 5, comment: '' })
+const { page: applicationsPage, perPage: applicationsPerPage, pageItems: applicationsPageItems } = useClientPagination(applications, 8)
+const { page: attendancePage, perPage: attendancePerPage, pageItems: attendancePageItems } = useClientPagination(attendance, 8)
+const applicationStatusOptions = [
+  { id: 'pending', name: 'На рассмотрении' },
+  { id: 'approved', name: 'Подтверждена' },
+  { id: 'waitlisted', name: 'Лист ожидания' },
+  { id: 'rejected', name: 'Отклонена' },
+  { id: 'cancelled', name: 'Отменена' }
+]
 
 const currentUserId = computed(() => authState.user?.id ?? '')
 const canManageEvent = computed(() => {
@@ -50,6 +64,9 @@ const canManageEvent = computed(() => {
 })
 const myApplication = computed(() => applications.value.find((app) => app.userId === currentUserId.value))
 const approvedParticipants = computed(() => applications.value.filter((app) => app.status === 'approved'))
+const approvedParticipantOptions = computed(() => approvedParticipants.value.map((app) => ({ id: app.userId, name: app.userName })))
+const myFeedback = computed(() => feedback.value.find((entry) => entry.userId === currentUserId.value))
+const canLeaveFeedback = computed(() => item.value?.status === 'completed' && !canManageEvent.value)
 
 const applicationStatusLabels: Record<EventApplication['status'], string> = {
   pending: 'На рассмотрении',
@@ -59,19 +76,24 @@ const applicationStatusLabels: Record<EventApplication['status'], string> = {
   cancelled: 'Отменена'
 }
 
+async function loadFeedback() {
+  const response = await fetchEventFeedback(eventId)
+  feedback.value = response.items
+  feedbackAverage.value = response.averageRating
+  feedbackCount.value = response.feedbackCount
+}
+
 async function load() {
   try {
     errorMessage.value = ''
-    const eventResponse = await fetchEvent(eventId)
-    item.value = eventResponse.item
-    const [appsResponse, shiftsResponse, feedbackResponse] = await Promise.all([
+    item.value = (await fetchEvent(eventId)).item
+    const [appsResponse, shiftsResponse] = await Promise.all([
       fetchEventApplications(eventId),
-      fetchEventShifts(eventId),
-      fetchEventFeedback(eventId)
+      fetchEventShifts(eventId)
     ])
     applications.value = appsResponse.items
     shifts.value = shiftsResponse.items
-    feedback.value = feedbackResponse.items
+    await loadFeedback()
     if (canManageEvent.value) {
       const attendanceResponse = await fetchEventAttendance(eventId)
       attendance.value = attendanceResponse.items
@@ -146,12 +168,18 @@ async function sendFeedback() {
   await createEventFeedback(eventId, feedbackForm)
   feedbackForm.rating = 5
   feedbackForm.comment = ''
-  feedback.value = (await fetchEventFeedback(eventId)).items
+  await loadFeedback()
+  successMessage.value = 'Спасибо, отзыв сохранен'
 }
 
 async function finishEvent() {
   await completeEvent(eventId)
   item.value = (await fetchEvent(eventId)).item
+  await loadFeedback()
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('ru-RU', { dateStyle: 'medium' }).format(new Date(value))
 }
 
 onMounted(load)
@@ -177,8 +205,9 @@ onMounted(load)
           <div><MapPin :size="18" /><span>{{ item.location || 'Место не указано' }}</span></div>
           <div><Users :size="18" /><span>Лимит: {{ item.maxParticipants || 'не указан' }}</span></div>
           <div v-if="canManageEvent"><QrCode :size="18" /><span>Код отметки: {{ item.checkinCode }}</span></div>
+          <div><Star :size="18" /><span>Средняя оценка: {{ feedbackCount ? feedbackAverage.toFixed(1) : 'нет отзывов' }}</span></div>
         </div>
-        <button v-if="canManageEvent" class="primary-action" type="button" @click="finishEvent">
+        <button v-if="canManageEvent && item.status !== 'completed'" class="primary-action" type="button" @click="finishEvent">
           <CheckCircle2 :size="17" /> Завершить и начислить часы
         </button>
       </div>
@@ -203,20 +232,15 @@ onMounted(load)
 
         <section v-if="canManageEvent" class="detail-panel">
           <p class="eyebrow">Заявки координатора</p>
-          <article v-for="app in applications" :key="app.id" class="member-row application-row">
+          <article v-for="app in applicationsPageItems" :key="app.id" class="member-row application-row">
             <div>
               <strong>{{ app.userName }}</strong>
               <small>{{ app.email }} · {{ app.message || 'без комментария' }}</small>
             </div>
             <span class="status-pill">{{ applicationStatusLabels[app.status] }}</span>
-            <select :value="app.status" @change="setApplicationStatus(app, ($event.target as HTMLSelectElement).value as EventApplication['status'])">
-              <option value="pending">На рассмотрении</option>
-              <option value="approved">Подтверждена</option>
-              <option value="waitlisted">Лист ожидания</option>
-              <option value="rejected">Отклонена</option>
-              <option value="cancelled">Отменена</option>
-            </select>
+            <CustomSelect :model-value="app.status" :options="applicationStatusOptions" @update:model-value="setApplicationStatus(app, $event as EventApplication['status'])" />
           </article>
+          <PaginationBar v-model:page="applicationsPage" :per-page="applicationsPerPage" :total="applications.length" />
           <p v-if="applications.length === 0" class="empty-state">Заявок пока нет.</p>
         </section>
 
@@ -235,14 +259,11 @@ onMounted(load)
         <section v-if="canManageEvent" class="detail-panel">
           <p class="eyebrow">Посещаемость</p>
           <form class="inline-member-form attendance-form" @submit.prevent="markAttendance">
-            <select v-model="attendanceForm.userId">
-              <option value="">Участник</option>
-              <option v-for="app in approvedParticipants" :key="app.id" :value="app.userId">{{ app.userName }}</option>
-            </select>
+            <CustomSelect v-model="attendanceForm.userId" :options="approvedParticipantOptions" placeholder="Участник" />
             <input v-model="attendanceForm.hours" type="number" step="0.25" min="0" placeholder="часы" />
             <button class="primary-action" type="submit"><Clock3 :size="17" /> Отметить</button>
           </form>
-          <article v-for="row in attendance" :key="row.id" class="member-row attendance-row">
+          <article v-for="row in attendancePageItems" :key="row.id" class="member-row attendance-row">
             <div>
               <strong>{{ row.userName }}</strong>
               <small>{{ row.email }}</small>
@@ -250,6 +271,7 @@ onMounted(load)
             <input v-model="attendanceHours[row.id]" type="number" min="0" step="0.25" />
             <button class="secondary-action" type="button" @click="saveAttendance(row)">Сохранить</button>
           </article>
+          <PaginationBar v-model:page="attendancePage" :per-page="attendancePerPage" :total="attendance.length" />
         </section>
 
         <section v-if="canManageEvent" class="detail-panel">
@@ -264,14 +286,40 @@ onMounted(load)
           <p v-for="shift in shifts" :key="shift.id">{{ shift.title }} · {{ formatDateTime(shift.startsAt) }}</p>
         </section>
 
-        <section class="detail-panel">
-          <p class="eyebrow">Обратная связь</p>
-          <form class="settings-form" @submit.prevent="sendFeedback">
-            <input v-model.number="feedbackForm.rating" type="number" min="1" max="5" />
+        <section class="detail-panel feedback-panel">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Обратная связь</p>
+              <h2>{{ feedbackCount ? `${feedbackAverage.toFixed(1)} / 5` : 'Пока нет оценок' }}</h2>
+            </div>
+          </div>
+
+          <form v-if="canLeaveFeedback" class="settings-form" @submit.prevent="sendFeedback">
+            <div class="rating-control" role="radiogroup" aria-label="Оценка мероприятия">
+              <button
+                v-for="value in 5"
+                :key="value"
+                type="button"
+                :class="{ active: feedbackForm.rating >= value }"
+                @click="feedbackForm.rating = value"
+              >
+                <Star :size="22" />
+              </button>
+            </div>
             <textarea v-model="feedbackForm.comment" rows="3" placeholder="Комментарий" />
-            <button class="primary-action" type="submit">Отправить</button>
+            <button class="primary-action" type="submit">{{ myFeedback ? 'Обновить отзыв' : 'Отправить отзыв' }}</button>
           </form>
-          <p v-for="entry in feedback" :key="entry.id">{{ entry.userName }} · {{ entry.rating }}/5 · {{ entry.comment }}</p>
+          <p v-else-if="!canManageEvent && item.status !== 'completed'" class="empty-state">Форма отзыва откроется после завершения мероприятия.</p>
+
+          <article v-for="entry in feedback" :key="entry.id" class="feedback-row">
+            <div>
+              <strong>{{ entry.userName }}</strong>
+              <small>{{ formatDate(entry.createdAt) }}</small>
+            </div>
+            <span class="status-pill">{{ entry.rating }}/5</span>
+            <p>{{ entry.comment || 'Без комментария' }}</p>
+          </article>
+          <p v-if="feedback.length === 0" class="empty-state">Отзывов пока нет.</p>
         </section>
       </div>
     </article>

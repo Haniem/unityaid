@@ -3,11 +3,14 @@ import { onMounted, ref } from 'vue'
 import { Bell, CheckCheck } from 'lucide-vue-next'
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../entities/notifications/api'
 import type { NotificationItem } from '../entities/notifications/types'
+import PaginationBar from '../shared/ui/PaginationBar.vue'
+import { useClientPagination } from '../shared/pagination'
 
 const items = ref<NotificationItem[]>([])
 const unreadCount = ref(0)
 const isLoading = ref(false)
 const errorMessage = ref('')
+const { page, perPage, pageItems } = useClientPagination(items, 12)
 
 async function load() {
   isLoading.value = true
@@ -61,7 +64,7 @@ onMounted(load)
 
     <div v-else class="notification-list">
       <article
-        v-for="item in items"
+        v-for="item in pageItems"
         :key="item.id"
         :class="['notification-card', { unread: !item.isRead }]"
       >
@@ -79,5 +82,6 @@ onMounted(load)
         </button>
       </article>
     </div>
+    <PaginationBar v-if="!isLoading" v-model:page="page" :per-page="perPage" :total="items.length" />
   </section>
 </template>

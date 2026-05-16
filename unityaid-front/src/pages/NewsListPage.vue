@@ -4,6 +4,8 @@ import { Filter, Pencil, Plus, Search, Trash2, X } from 'lucide-vue-next'
 import { deleteNews, fetchNewsCategories, fetchNewsList } from '../entities/news/api'
 import type { NewsCategory, NewsItem } from '../entities/news/types'
 import CustomSelect from '../shared/ui/CustomSelect.vue'
+import PaginationBar from '../shared/ui/PaginationBar.vue'
+import { useClientPagination } from '../shared/pagination'
 
 const items = ref<NewsItem[]>([])
 const categories = ref<NewsCategory[]>([])
@@ -13,6 +15,7 @@ const errorMessage = ref('')
 const search = ref('')
 const status = ref('')
 const categoryId = ref('')
+const { page, perPage, pageItems } = useClientPagination(items, 12)
 
 const statusOptions = [
   { id: '', name: 'Все статусы' },
@@ -83,7 +86,7 @@ onMounted(async () => {
     <div v-else-if="items.length === 0" class="empty-state">Новостей пока нет.</div>
 
     <div v-else class="news-grid">
-      <article v-for="item in items" :key="item.id" class="news-card">
+      <article v-for="item in pageItems" :key="item.id" class="news-card">
         <RouterLink :to="`/news/${item.id}`" class="news-card-main">
           <img v-if="item.coverImageUrl" :src="item.coverImageUrl" alt="" />
           <div v-else class="news-cover-placeholder">UnityAid</div>
@@ -100,6 +103,7 @@ onMounted(async () => {
         </div>
       </article>
     </div>
+    <PaginationBar v-if="!isLoading" v-model:page="page" :per-page="perPage" :total="items.length" />
 
     <div v-if="isFiltersOpen" class="drawer-backdrop" @click.self="isFiltersOpen = false">
       <aside class="filter-drawer">

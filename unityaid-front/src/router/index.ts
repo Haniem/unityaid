@@ -17,6 +17,9 @@ import TasksPage from '../pages/TasksPage.vue'
 import EventDetailPage from '../pages/EventDetailPage.vue'
 import AchievementsPage from '../pages/AchievementsPage.vue'
 import AnalyticsPage from '../pages/AnalyticsPage.vue'
+import AdminPanelPage from '../pages/AdminPanelPage.vue'
+import CertificatesPage from '../pages/CertificatesPage.vue'
+import CertificateVerifyPage from '../pages/CertificateVerifyPage.vue'
 import OrganizationDetailPage from '../pages/OrganizationDetailPage.vue'
 import TaskDetailPage from '../pages/TaskDetailPage.vue'
 import TimeEntriesPage from '../pages/TimeEntriesPage.vue'
@@ -50,6 +53,11 @@ export const router = createRouter({
           path: 'settings',
           name: 'settings',
           component: SettingsPage
+        },
+        {
+          path: 'admin',
+          name: 'admin',
+          component: AdminPanelPage
         },
         {
           path: 'organizations',
@@ -111,6 +119,17 @@ export const router = createRouter({
           path: 'achievements',
           name: 'achievements',
           component: AchievementsPage
+        },
+        {
+          path: 'certificates',
+          name: 'certificates',
+          component: CertificatesPage
+        },
+        {
+          path: 'certificates/verify/:code?',
+          name: 'certificate-verify',
+          component: CertificateVerifyPage,
+          meta: { public: true }
         },
         {
           path: 'notifications',
@@ -181,7 +200,7 @@ router.beforeEach(async (to) => {
     return { name: 'login', query: { redirect: to.fullPath } }
   }
 
-  if (to.meta.public && authState.user) {
+  if (to.name === 'login' && authState.user) {
     return { name: 'dashboard' }
   }
 

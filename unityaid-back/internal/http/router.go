@@ -7,9 +7,11 @@ import (
 
 	"unityaid-back/internal/config"
 	"unityaid-back/internal/http/handlers"
+	"unityaid-back/internal/modules/admin"
 	"unityaid-back/internal/modules/analytics"
 	"unityaid-back/internal/modules/audit"
 	"unityaid-back/internal/modules/auth"
+	"unityaid-back/internal/modules/certificates"
 	"unityaid-back/internal/modules/events"
 	"unityaid-back/internal/modules/files"
 	"unityaid-back/internal/modules/forms"
@@ -66,14 +68,18 @@ func NewRouter(deps RouterDeps) http.Handler {
 	notificationsRepository := notifications.NewRepository(deps.DB)
 	notificationsService := notifications.NewService(notificationsRepository)
 	notificationsHandler := notifications.NewHandler(notificationsService)
+	adminRepository := admin.NewRepository(deps.DB)
+	adminService := admin.NewService(adminRepository)
+	adminHandler := admin.NewHandler(adminService, authorizer)
 
 	authGroup := api.Group("/auth")
-	authGroup.POST("/register", authHandler.Register)
-	authGroup.POST("/login", authHandler.Login)
-	authGroup.POST("/refresh", authHandler.Refresh)
-	authGroup.POST("/forgot-password", authHandler.ForgotPassword)
-	authGroup.POST("/reset-password", authHandler.ResetPassword)
-	authGroup.POST("/verify-email", authHandler.VerifyEmail)
+	authLimiter := RateLimit(10, time.Minute)
+	authGroup.POST("/register", authLimiter, authHandler.Register)
+	authGroup.POST("/login", authLimiter, authHandler.Login)
+	authGroup.POST("/refresh", authLimiter, authHandler.Refresh)
+	authGroup.POST("/forgot-password", authLimiter, authHandler.ForgotPassword)
+	authGroup.POST("/reset-password", authLimiter, authHandler.ResetPassword)
+	authGroup.POST("/verify-email", authLimiter, authHandler.VerifyEmail)
 	authGroup.POST("/logout", authMiddleware, auditMiddleware, authHandler.Logout)
 	authGroup.GET("/me", authMiddleware, authHandler.Me)
 	authGroup.POST("/change-password", authMiddleware, auditMiddleware, authHandler.ChangePassword)
@@ -193,6 +199,16 @@ func NewRouter(deps RouterDeps) http.Handler {
 	achievementsGroup.GET("", gamificationHandler.ListAchievements)
 	achievementsGroup.POST("/recalculate", gamificationHandler.Recalculate)
 
+	certificatesRepository := certificates.NewRepository(deps.DB)
+	certificatesService := certificates.NewService(certificatesRepository)
+	certificatesHandler := certificates.NewHandler(certificatesService, authorizer)
+
+	certificatesGroup := api.Group("/certificates", authMiddleware, auditMiddleware)
+	certificatesGroup.GET("", certificatesHandler.List)
+	certificatesGroup.POST("/generate", certificatesHandler.Generate)
+	certificatesGroup.GET("/download/:id", certificatesHandler.Download)
+	api.GET("/certificates/verify/:code", certificatesHandler.Verify)
+
 	analyticsRepository := analytics.NewRepository(deps.DB)
 	analyticsService := analytics.NewService(analyticsRepository)
 	analyticsHandler := analytics.NewHandler(analyticsService)
@@ -243,6 +259,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 	notificationsGroup.GET("", notificationsHandler.List)
 	notificationsGroup.POST("/:id/read", notificationsHandler.MarkRead)
 	notificationsGroup.POST("/read-all", notificationsHandler.MarkAllRead)
+
+	adminGroup := api.Group("/admin", authMiddleware, auditMiddleware, adminHandler.RequireSuperAdmin)
+	adminGroup.GET("/entities", adminHandler.Entities)
+	adminGroup.GET("/:entity", adminHandler.List)
+	adminGroup.POST("/:entity", adminHandler.Create)
+	adminGroup.PUT("/:entity/:id", adminHandler.Update)
+	adminGroup.DELETE("/:entity/:id", adminHandler.Delete)
 
 	return router
 }

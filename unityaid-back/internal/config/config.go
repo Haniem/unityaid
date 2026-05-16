@@ -20,7 +20,7 @@ func Load() Config {
 		AppEnv:             getEnv("APP_ENV", "development"),
 		HTTPPort:           getEnv("HTTP_PORT", "8080"),
 		DatabaseURL:        getEnv("DATABASE_URL", "postgres://unityaid:unityaid@localhost:5432/unityaid?sslmode=disable"),
-		CORSAllowedOrigins: splitCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173")),
+		CORSAllowedOrigins: splitCSV(getEnv("CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175")),
 		JWTSecret:          getEnv("JWT_SECRET", "dev-change-me"),
 		RunSeeds:           getEnv("RUN_SEEDS", "true") == "true",
 		UploadsDir:         getEnv("UPLOADS_DIR", "uploads"),

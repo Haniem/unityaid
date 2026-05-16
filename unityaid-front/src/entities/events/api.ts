@@ -1,6 +1,6 @@
 import { apiRequest } from '../../shared/api'
 import { authState } from '../auth/store'
-import type { EventApplication, EventAttendance, EventFeedback, EventItem, EventPayload, EventShift } from './types'
+import type { EventApplication, EventAttendance, EventFeedback, EventFeedbackResponse, EventItem, EventPayload, EventShift } from './types'
 
 const token = () => authState.token
 
@@ -63,7 +63,7 @@ export const createEventShift = (id: string, payload: { title: string; startsAt:
   apiRequest<{ item: EventShift }>(`/events/${id}/shifts`, { method: 'POST', token: token(), body: JSON.stringify(payload) })
 
 export const fetchEventFeedback = (id: string) =>
-  apiRequest<{ items: EventFeedback[] }>(`/events/${id}/feedback`, { token: token() })
+  apiRequest<EventFeedbackResponse>(`/events/${id}/feedback`, { token: token() })
 
 export const createEventFeedback = (id: string, payload: { rating: number; comment: string }) =>
   apiRequest<{ item: EventFeedback }>(`/events/${id}/feedback`, { method: 'POST', token: token(), body: JSON.stringify(payload) })

@@ -10,6 +10,7 @@ import {
   updateKnowledgeArticle
 } from '../entities/knowledge/api'
 import type { KnowledgeCategory, KnowledgePayload } from '../entities/knowledge/types'
+import CustomSelect from '../shared/ui/CustomSelect.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -18,6 +19,7 @@ const isSaving = ref(false)
 const errorMessage = ref('')
 const categoryName = ref('')
 const isEdit = computed(() => Boolean(route.params.id))
+const statusOptions = [{ id: 'draft', name: 'Черновик' }, { id: 'published', name: 'Опубликовано' }, { id: 'archived', name: 'Архив' }]
 
 const form = reactive<KnowledgePayload>({
   categoryId: null,
@@ -89,19 +91,12 @@ onMounted(async () => {
       <div class="form-columns">
         <label class="form-field">
           <span class="field-label">Категория</span>
-          <select v-model="form.categoryId">
-            <option :value="null">Без категории</option>
-            <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
-          </select>
+          <CustomSelect v-model="form.categoryId" :options="[{ id: '', name: 'Без категории' }, ...categories.map((category) => ({ id: category.id, name: category.name }))]" />
         </label>
 
         <label class="form-field">
           <span class="field-label">Статус</span>
-          <select v-model="form.status">
-            <option value="draft">Черновик</option>
-            <option value="published">Опубликовано</option>
-            <option value="archived">Архив</option>
-          </select>
+          <CustomSelect v-model="form.status" :options="statusOptions" />
         </label>
       </div>
 

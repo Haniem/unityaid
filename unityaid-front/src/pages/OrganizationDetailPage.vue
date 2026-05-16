@@ -16,6 +16,9 @@ import type {
   OrganizationMember,
   OrganizationPayload
 } from '../entities/organizations/types'
+import CustomSelect from '../shared/ui/CustomSelect.vue'
+import PaginationBar from '../shared/ui/PaginationBar.vue'
+import { useClientPagination } from '../shared/pagination'
 
 const route = useRoute()
 const organizationId = computed(() => String(route.params.id))
@@ -25,6 +28,7 @@ const errorMessage = ref('')
 const memberError = ref('')
 const settingsMessage = ref('')
 const settingsError = ref('')
+const { page, perPage, pageItems } = useClientPagination(members, 10)
 
 const memberForm = reactive<AddOrganizationMemberPayload>({
   email: '',
@@ -44,16 +48,16 @@ const settingsForm = reactive<OrganizationPayload>({
 })
 
 const roleOptions = [
-  { value: 'super_admin', label: 'Super admin' },
-  { value: 'org_admin', label: 'Администратор' },
-  { value: 'coordinator', label: 'Координатор' },
-  { value: 'volunteer', label: 'Волонтер' }
+  { id: 'super_admin', name: 'Super admin' },
+  { id: 'org_admin', name: 'Администратор' },
+  { id: 'coordinator', name: 'Координатор' },
+  { id: 'volunteer', name: 'Волонтер' }
 ] as const
 
 const statusOptions = [
-  { value: 'active', label: 'Активен' },
-  { value: 'inactive', label: 'Неактивен' },
-  { value: 'blocked', label: 'Заблокирован' }
+  { id: 'active', name: 'Активен' },
+  { id: 'inactive', name: 'Неактивен' },
+  { id: 'blocked', name: 'Заблокирован' }
 ] as const
 
 function syncSettingsForm(organization: Organization) {
@@ -192,34 +196,27 @@ onMounted(load)
 
           <form class="inline-member-form" @submit.prevent="addMember">
             <input v-model="memberForm.email" type="email" placeholder="email пользователя" required />
-            <select v-model="memberForm.role">
-              <option v-for="option in roleOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-            </select>
-            <select v-model="memberForm.status">
-              <option v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-            </select>
+            <CustomSelect v-model="memberForm.role" :options="roleOptions" />
+            <CustomSelect v-model="memberForm.status" :options="statusOptions" />
             <button class="primary-action" type="submit">Добавить</button>
           </form>
           <p v-if="memberError" class="form-error">{{ memberError }}</p>
 
           <div class="member-list">
-            <article v-for="member in members" :key="member.id" class="member-row">
+            <article v-for="member in pageItems" :key="member.id" class="member-row">
               <img :src="member.avatarUrl ?? 'https://i.pravatar.cc/160?img=12'" alt="" />
               <div>
                 <strong>{{ member.lastName }} {{ member.firstName }}</strong>
                 <small>{{ member.email }}</small>
               </div>
-              <select v-model="member.role" @change="updateMember(member)">
-                <option v-for="option in roleOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-              </select>
-              <select v-model="member.status" @change="updateMember(member)">
-                <option v-for="option in statusOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
-              </select>
+              <CustomSelect v-model="member.role" :options="roleOptions" @update:model-value="updateMember(member)" />
+              <CustomSelect v-model="member.status" :options="statusOptions" @update:model-value="updateMember(member)" />
               <button class="icon-button" type="button" aria-label="Удалить участника" @click="removeMember(member)">
                 <Trash2 :size="17" />
               </button>
             </article>
           </div>
+          <PaginationBar v-model:page="page" :per-page="perPage" :total="members.length" />
         </section>
 
         <form class="detail-panel settings-form" @submit.prevent="saveSettings">

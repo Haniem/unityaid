@@ -61,8 +61,15 @@ export type EventShift = {
 
 export type EventFeedback = {
   id: string
+  userId: string
   userName: string
   rating: number
   comment: string
   createdAt: string
+}
+
+export type EventFeedbackResponse = {
+  items: EventFeedback[]
+  averageRating: number
+  feedbackCount: number
 }

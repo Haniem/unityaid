@@ -236,6 +236,17 @@ func (r *Repository) ListFeedback(ctx context.Context, eventID string) ([]Feedba
 	return items, rows.Err()
 }
 
+func (r *Repository) FeedbackSummary(ctx context.Context, eventID string) (float64, int, error) {
+	var average float64
+	var count int
+	err := r.db.QueryRow(ctx, `
+		SELECT COALESCE(AVG(rating), 0)::float8, COUNT(*)::int
+		FROM event_feedback
+		WHERE event_id = $1
+	`, eventID).Scan(&average, &count)
+	return average, count, err
+}
+
 func (r *Repository) CreateFeedback(ctx context.Context, eventID, userID string, req FeedbackRequest) (Feedback, error) {
 	var id string
 	err := r.db.QueryRow(ctx, `

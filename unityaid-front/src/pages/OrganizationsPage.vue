@@ -6,7 +6,9 @@ import type { Organization, OrganizationPayload } from '../entities/organization
 import { fetchCreateForm, fetchEditForm } from '../entities/forms/api'
 import type { BackendForm, FormModel } from '../entities/forms/types'
 import DynamicForm from '../shared/ui/DynamicForm.vue'
+import PaginationBar from '../shared/ui/PaginationBar.vue'
 import { modelFromForm, nullable, stringValue } from '../shared/forms'
+import { useClientPagination } from '../shared/pagination'
 
 const items = ref<Organization[]>([])
 const editingId = ref<string | null>(null)
@@ -16,6 +18,7 @@ const search = ref('')
 const includeDeleted = ref(false)
 const formSchema = ref<BackendForm | null>(null)
 const formModel = ref<FormModel>({})
+const { page, perPage, pageItems } = useClientPagination(items, 12)
 
 const activeCount = computed(() => items.value.filter((item) => !item.isDeleted).length)
 
@@ -114,7 +117,7 @@ onMounted(load)
     </div>
 
     <div v-if="items.length" class="directory-grid">
-      <article v-for="item in items" :key="item.id" class="directory-card" :class="{ muted: item.isDeleted }">
+      <article v-for="item in pageItems" :key="item.id" class="directory-card" :class="{ muted: item.isDeleted }">
         <div class="directory-card-main">
           <div class="organization-card-head">
             <img v-if="item.logoUrl" :src="item.logoUrl" alt="" />
@@ -136,6 +139,7 @@ onMounted(load)
         </div>
       </article>
     </div>
+    <PaginationBar v-if="items.length" v-model:page="page" :per-page="perPage" :total="items.length" />
 
     <div v-else class="empty-state">Организации не найдены.</div>
 

@@ -6,8 +6,11 @@ import type { TaskItem, TaskPayload } from '../entities/tasks/types'
 import { fetchCreateForm, fetchEditForm } from '../entities/forms/api'
 import type { BackendForm, FormModel } from '../entities/forms/types'
 import DynamicForm from '../shared/ui/DynamicForm.vue'
+import CustomSelect from '../shared/ui/CustomSelect.vue'
+import PaginationBar from '../shared/ui/PaginationBar.vue'
 import { isoFromDatetimeLocal, modelFromForm, nullable, stringValue } from '../shared/forms'
 import { formatDateTime } from '../shared/date'
+import { useClientPagination } from '../shared/pagination'
 
 const items = ref<TaskItem[]>([])
 const editingId = ref<string | null>(null)
@@ -17,6 +20,22 @@ const statusFilter = ref('')
 const priorityFilter = ref('')
 const formSchema = ref<BackendForm | null>(null)
 const formModel = ref<FormModel>({})
+const { page, perPage, pageItems } = useClientPagination(items, 12)
+
+const statusOptions = [
+  { id: '', name: 'Все статусы' },
+  { id: 'created', name: 'Создана' },
+  { id: 'assigned', name: 'Назначена' },
+  { id: 'in_progress', name: 'В работе' },
+  { id: 'review', name: 'На проверке' },
+  { id: 'completed', name: 'Выполнена' }
+]
+const priorityOptions = [
+  { id: '', name: 'Все приоритеты' },
+  { id: 'low', name: 'Низкий' },
+  { id: 'medium', name: 'Средний' },
+  { id: 'high', name: 'Высокий' }
+]
 
 function resetForm() {
   editingId.value = null
@@ -97,28 +116,16 @@ onMounted(load)
     <div class="filter-bar">
       <label class="filter-select">
         <span>Статус</span>
-        <select v-model="statusFilter" @change="load">
-          <option value="">Все статусы</option>
-          <option value="created">Создана</option>
-          <option value="assigned">Назначена</option>
-          <option value="in_progress">В работе</option>
-          <option value="review">На проверке</option>
-          <option value="completed">Выполнена</option>
-        </select>
+        <CustomSelect v-model="statusFilter" :options="statusOptions" @update:model-value="load" />
       </label>
       <label class="filter-select">
         <span>Приоритет</span>
-        <select v-model="priorityFilter" @change="load">
-          <option value="">Все приоритеты</option>
-          <option value="low">Низкий</option>
-          <option value="medium">Средний</option>
-          <option value="high">Высокий</option>
-        </select>
+        <CustomSelect v-model="priorityFilter" :options="priorityOptions" @update:model-value="load" />
       </label>
     </div>
 
     <div class="task-board">
-      <article v-for="item in items" :key="item.id" class="task-card">
+      <article v-for="item in pageItems" :key="item.id" class="task-card">
         <RouterLink class="task-card-main" :to="`/tasks/${item.id}`">
           <span :class="['priority-dot', item.priority]"></span>
           <h2>{{ item.title }}</h2>
@@ -132,6 +139,7 @@ onMounted(load)
         </div>
       </article>
     </div>
+    <PaginationBar v-model:page="page" :per-page="perPage" :total="items.length" />
 
     <div v-if="isModalOpen" class="modal-backdrop" @click.self="closeModal">
       <form class="modal-panel entity-form" @submit.prevent="submit">

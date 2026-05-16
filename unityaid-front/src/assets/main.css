@@ -1420,6 +1420,27 @@ a {
   box-shadow: 0 18px 46px rgba(18, 26, 47, 0.16);
 }
 
+.custom-select-search {
+  min-height: 36px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  padding: 0 10px;
+  border: 1px solid #e2e7ef;
+  border-radius: 7px;
+  color: #7a8499;
+  background: #f8fafc;
+}
+
+.custom-select-search input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  color: #121a2f;
+  background: transparent;
+}
+
 .custom-select-option {
   width: 100%;
   min-height: 36px;
@@ -1440,6 +1461,49 @@ a {
 .custom-select-option.selected {
   color: var(--accent-strong);
   background: var(--accent-soft);
+}
+
+.custom-select-more {
+  width: 100%;
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+  border: 1px dashed var(--accent-border);
+  border-radius: 7px;
+  color: var(--accent-strong);
+  background: #f8fcfa;
+  cursor: pointer;
+}
+
+.custom-select-empty {
+  margin: 8px 6px;
+  color: #8490a6;
+  font-size: 0.9rem;
+}
+
+.pagination-bar {
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 18px;
+  color: #66708a;
+}
+
+.pagination-bar div {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pagination-bar strong {
+  min-width: 72px;
+  text-align: center;
+  color: #121a2f;
 }
 
 .filter-select {
@@ -1734,8 +1798,10 @@ a {
 .inline-member-form select,
 .member-row select,
 .settings-form input,
+.settings-form select,
 .settings-form textarea,
 .entity-form input,
+.entity-form select,
 .entity-form textarea {
   width: 100%;
   border: 1px solid #dde1ec;
@@ -1749,6 +1815,7 @@ a {
 .inline-member-form select,
 .member-row select,
 .settings-form input,
+.settings-form select,
 .entity-form input {
   height: 42px;
   padding: 0 12px;
@@ -1758,6 +1825,166 @@ a {
 .entity-form textarea {
   padding: 12px;
   resize: vertical;
+}
+
+.certificate-layout,
+.admin-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.certificate-list,
+.admin-content {
+  display: grid;
+  gap: 18px;
+}
+
+.certificate-card {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+}
+
+.certificate-card h2,
+.certificate-result h2 {
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+
+.certificate-card p,
+.certificate-result p {
+  color: #657086;
+  line-height: 1.5;
+}
+
+.certificate-icon,
+.certificate-result > svg {
+  width: 54px;
+  height: 54px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.certificate-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.certificate-meta span {
+  padding: 5px 9px;
+  border-radius: 8px;
+  color: #405047;
+  background: #f1f5f3;
+  font-size: 0.86rem;
+}
+
+.certificate-verify-form {
+  max-width: 760px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.certificate-result {
+  max-width: 760px;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.admin-entities {
+  position: sticky;
+  top: 92px;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-entity-button {
+  display: block;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #e1e5ee;
+  border-radius: 8px;
+  text-align: left;
+  color: #405047;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.admin-entity-button.active {
+  border-color: var(--accent-border);
+  color: var(--accent-strong);
+  background: var(--accent-soft);
+}
+
+.admin-entity-button strong,
+.admin-entity-button small {
+  display: block;
+}
+
+.admin-entity-button small {
+  margin-top: 4px;
+  color: #8490a6;
+}
+
+.admin-table-wrap {
+  overflow-x: auto;
+  border: 1px solid #e1e5ee;
+  border-radius: 8px;
+}
+
+.admin-table {
+  width: 100%;
+  min-width: 920px;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.admin-table th,
+.admin-table td {
+  max-width: 240px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #edf0f5;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.admin-table th {
+  color: #657086;
+  background: #f6f8fb;
+}
+
+.admin-table td:last-child {
+  min-width: 92px;
+  white-space: nowrap;
+}
+
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.admin-json-editor {
+  width: 100%;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
 }
 
 .member-list {
@@ -2280,6 +2507,55 @@ a {
   max-width: 960px;
 }
 
+.feedback-panel {
+  grid-column: 1 / -1;
+}
+
+.rating-control {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.rating-control button {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #dde3ed;
+  border-radius: 8px;
+  color: #a9b0c2;
+  background: #ffffff;
+  cursor: pointer;
+}
+
+.rating-control button.active {
+  color: #d89614;
+  border-color: #f0d28a;
+  background: #fff8e6;
+}
+
+.feedback-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(220px, 2fr);
+  gap: 14px;
+  align-items: start;
+  padding: 14px 0;
+  border-top: 1px solid #edf0f5;
+}
+
+.feedback-row small {
+  display: block;
+  margin-top: 4px;
+  color: #8e97ac;
+}
+
+.feedback-row p {
+  margin: 0;
+  color: #657086;
+  overflow-wrap: anywhere;
+}
+
 .settings-search {
   margin-bottom: 14px;
 }
@@ -2472,6 +2748,8 @@ a {
   .management-grid,
   .settings-layout,
   .time-layout,
+  .certificate-layout,
+  .admin-layout,
   .achievement-layout,
   .organization-management,
   .volunteers-layout,
@@ -2521,7 +2799,11 @@ a {
   }
 
   .knowledge-grid,
-  .knowledge-card-main {
+  .knowledge-card-main,
+  .certificate-card,
+  .certificate-verify-form,
+  .certificate-result,
+  .feedback-row {
     grid-template-columns: 1fr;
   }
 }

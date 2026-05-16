@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Save, Search, ShieldCheck, SlidersHorizontal } from 'lucide-vue-next'
+import { Database, Save, Search, ShieldCheck, SlidersHorizontal } from 'lucide-vue-next'
+import { authState } from '../entities/auth/store'
 import { fetchSystemRoles, fetchUsers, updateUserSystemRoles } from '../entities/users/api'
 import type { SystemRole, User } from '../entities/users/types'
 
@@ -23,6 +24,7 @@ const filteredUsers = computed(() => {
 })
 
 const selectedUser = computed(() => users.value.find((user) => user.id === selectedUserId.value) || null)
+const isSuperAdmin = computed(() => authState.user?.primaryRole === 'super_admin')
 
 async function load() {
   loadError.value = ''
@@ -85,6 +87,10 @@ onMounted(load)
         <h1>Системные роли</h1>
         <p>Управление правами пользователя на уровне всей системы отдельно от ролей внутри организаций.</p>
       </div>
+      <RouterLink v-if="isSuperAdmin" class="secondary-action" to="/admin">
+        <Database :size="17" />
+        <span>Админ-панель</span>
+      </RouterLink>
     </div>
 
     <p v-if="loadError" class="form-error">{{ loadError }}</p>

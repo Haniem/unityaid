@@ -2,6 +2,7 @@ package events
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"unityaid-back/internal/modules/notifications"
@@ -139,7 +140,14 @@ func (s *Service) ListFeedback(ctx context.Context, eventID string) ([]Feedback,
 	return s.repository.ListFeedback(ctx, eventID)
 }
 
+func (s *Service) FeedbackSummary(ctx context.Context, eventID string) (float64, int, error) {
+	return s.repository.FeedbackSummary(ctx, eventID)
+}
+
 func (s *Service) CreateFeedback(ctx context.Context, eventID string, userID string, request FeedbackRequest) (Feedback, error) {
+	if request.Rating < 1 || request.Rating > 5 {
+		return Feedback{}, errors.New("rating must be between 1 and 5")
+	}
 	return s.repository.CreateFeedback(ctx, eventID, userID, request)
 }
 

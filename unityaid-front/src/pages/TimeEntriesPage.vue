@@ -9,6 +9,9 @@ import type { TaskItem } from '../entities/tasks/types'
 import { approveTimeEntry, createTimeEntry, fetchTimeEntries, rejectTimeEntry } from '../entities/timeentries/api'
 import type { TimeEntry, TimeEntryStatus } from '../entities/timeentries/types'
 import { formatDateTime } from '../shared/date'
+import CustomSelect from '../shared/ui/CustomSelect.vue'
+import PaginationBar from '../shared/ui/PaginationBar.vue'
+import { useClientPagination } from '../shared/pagination'
 
 const items = ref<TimeEntry[]>([])
 const events = ref<EventItem[]>([])
@@ -17,6 +20,11 @@ const statusFilter = ref('')
 const errorMessage = ref('')
 const successMessage = ref('')
 const form = reactive({ targetType: 'event' as 'event' | 'task', targetId: '', hours: '', description: '' })
+const { page, perPage, pageItems } = useClientPagination(items, 12)
+const pendingItems = computed(() => items.value.filter((item) => item.status === 'pending'))
+const { page: pendingPage, perPage: pendingPerPage, pageItems: pendingPageItems } = useClientPagination(pendingItems, 8)
+const targetTypeOptions = [{ id: 'event', name: 'Мероприятие' }, { id: 'task', name: 'Задача' }]
+const timeStatusOptions = [{ id: '', name: 'Все' }, { id: 'pending', name: 'На проверке' }, { id: 'approved', name: 'Подтверждено' }, { id: 'rejected', name: 'Отклонено' }]
 
 const canReview = computed(() => {
   const systemAdmin = authState.user?.systemRoles?.some((role) => role.code === 'system_admin') ?? false
@@ -30,7 +38,7 @@ const approvedHours = computed(() =>
     .filter((item) => item.status === 'approved' && item.userId === authState.user?.id)
     .reduce((sum, item) => sum + item.hours, 0)
 )
-const pendingItems = computed(() => items.value.filter((item) => item.status === 'pending'))
+const targetOptions = computed(() => form.targetType === 'event' ? events.value.map((event) => ({ id: event.id, name: event.title })) : tasks.value.map((task) => ({ id: task.id, name: task.title })))
 
 const statusLabels: Record<TimeEntryStatus, string> = {
   pending: 'На проверке',
@@ -115,23 +123,12 @@ onMounted(load)
 
         <label>
           <span>Тип работы</span>
-          <select v-model="form.targetType" @change="updateDefaultTarget">
-            <option value="event">Мероприятие</option>
-            <option value="task">Задача</option>
-          </select>
+          <CustomSelect v-model="form.targetType" :options="targetTypeOptions" @update:model-value="updateDefaultTarget" />
         </label>
 
         <label>
           <span>{{ form.targetType === 'event' ? 'Мероприятие' : 'Задача' }}</span>
-          <select v-model="form.targetId" required>
-            <option value="">Выберите запись</option>
-            <template v-if="form.targetType === 'event'">
-              <option v-for="event in events" :key="event.id" :value="event.id">{{ event.title }}</option>
-            </template>
-            <template v-else>
-              <option v-for="task in tasks" :key="task.id" :value="task.id">{{ task.title }}</option>
-            </template>
-          </select>
+          <CustomSelect v-model="form.targetId" :options="targetOptions" placeholder="Выберите запись" />
         </label>
 
         <label>
@@ -158,7 +155,7 @@ onMounted(load)
               <h2>Ожидают подтверждения</h2>
             </div>
           </div>
-          <article v-for="item in pendingItems" :key="item.id" class="time-row">
+          <article v-for="item in pendingPageItems" :key="item.id" class="time-row">
             <div>
               <strong>{{ item.userName }}</strong>
               <small>{{ targetTitle(item) }} · {{ item.organizationName }} · {{ item.hours }} ч.</small>
@@ -173,6 +170,7 @@ onMounted(load)
               </button>
             </div>
           </article>
+          <PaginationBar v-model:page="pendingPage" :per-page="pendingPerPage" :total="pendingItems.length" />
           <p v-if="pendingItems.length === 0" class="empty-state">Нет записей на проверке.</p>
         </section>
 
@@ -184,16 +182,11 @@ onMounted(load)
             </div>
             <label class="filter-select compact-filter">
               <span>Статус</span>
-              <select v-model="statusFilter" @change="load">
-                <option value="">Все</option>
-                <option value="pending">На проверке</option>
-                <option value="approved">Подтверждено</option>
-                <option value="rejected">Отклонено</option>
-              </select>
+              <CustomSelect v-model="statusFilter" :options="timeStatusOptions" @update:model-value="load" />
             </label>
           </div>
 
-          <article v-for="item in items" :key="item.id" class="time-row">
+          <article v-for="item in pageItems" :key="item.id" class="time-row">
             <div>
               <strong>{{ targetTitle(item) }}</strong>
               <small>{{ item.userName }} · {{ item.organizationName }} · {{ formatDateTime(item.createdAt) }}</small>
@@ -204,6 +197,7 @@ onMounted(load)
               <span class="status-pill">{{ statusLabels[item.status] }}</span>
             </div>
           </article>
+          <PaginationBar v-model:page="page" :per-page="perPage" :total="items.length" />
           <p v-if="items.length === 0" class="empty-state">История часов пока пуста.</p>
         </section>
       </div>

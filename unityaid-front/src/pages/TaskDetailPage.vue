@@ -16,6 +16,7 @@ import {
 } from '../entities/tasks/api'
 import type { TaskAttachment, TaskComment, TaskItem, TaskStatusHistory, TaskTimeEntry } from '../entities/tasks/types'
 import { formatDateTime } from '../shared/date'
+import CustomSelect from '../shared/ui/CustomSelect.vue'
 
 const route = useRoute()
 const taskId = String(route.params.id)
@@ -30,6 +31,7 @@ const assignment = reactive({ userId: '', role: 'assignee' })
 const comment = ref('')
 const attachment = reactive({ fileName: '', fileUrl: '' })
 const timeEntry = reactive({ hours: '', note: '' })
+const assignmentRoleOptions = [{ id: 'assignee', name: 'Исполнитель' }, { id: 'co_assignee', name: 'Соисполнитель' }]
 
 async function load() {
   try {
@@ -112,7 +114,7 @@ onMounted(load)
           <p class="eyebrow">Исполнители</p>
           <form class="inline-member-form" @submit.prevent="submitAssignment">
             <input v-model="assignment.userId" placeholder="ID пользователя" required />
-            <select v-model="assignment.role"><option value="assignee">исполнитель</option><option value="co_assignee">соисполнитель</option></select>
+            <CustomSelect v-model="assignment.role" :options="assignmentRoleOptions" />
             <button class="primary-action" type="submit">Назначить</button>
           </form>
           <p v-for="assignee in item.assignees" :key="assignee.userId">{{ assignee.name }} · {{ assignee.role }}</p>

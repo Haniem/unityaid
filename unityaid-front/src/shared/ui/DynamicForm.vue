@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { HelpCircle, ImagePlus } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { HelpCircle, ImagePlus, Search } from 'lucide-vue-next'
 import type { BackendForm, FormField, FormModel, FormValue } from '../../entities/forms/types'
 import { uploadFormFile } from '../../entities/forms/api'
 import { datetimeLocalValue } from '../forms'
@@ -13,6 +13,9 @@ const props = defineProps<{
 
 const emit = defineEmits<{ 'update:modelValue': [value: FormModel] }>()
 const fields = computed(() => props.form.fields)
+const multiQueries = ref<Record<string, string>>({})
+const multiPages = ref<Record<string, number>>({})
+const multiPageSize = 20
 
 function update(code: string, value: FormValue) {
   emit('update:modelValue', { ...props.modelValue, [code]: value })
@@ -35,6 +38,20 @@ function isSelected(field: FormField, id: string) {
 function toggleMulti(field: FormField, id: string, checked: boolean) {
   const current = Array.isArray(valueOf(field)) ? [...(valueOf(field) as string[])] : []
   update(field.code, checked ? [...new Set([...current, id])] : current.filter((item) => item !== id))
+}
+
+function filteredMultiOptions(field: FormField) {
+  const query = (multiQueries.value[field.code] || '').trim().toLowerCase()
+  const options = field.possibleValues || []
+  return query ? options.filter((item) => item.name.toLowerCase().includes(query)) : options
+}
+
+function visibleMultiOptions(field: FormField) {
+  return filteredMultiOptions(field).slice(0, (multiPages.value[field.code] || 1) * multiPageSize)
+}
+
+function showMoreMulti(field: FormField) {
+  multiPages.value[field.code] = (multiPages.value[field.code] || 1) + 1
 }
 
 async function upload(field: FormField, event: Event) {
@@ -79,10 +96,17 @@ async function upload(field: FormField, event: Event) {
       />
 
       <div v-else-if="field.type === 'select' && field.multi" class="multi-select-list">
-        <label v-for="option in field.possibleValues || []" :key="option.id" class="multi-select-option">
+        <label class="custom-select-search">
+          <Search :size="15" />
+          <input v-model="multiQueries[field.code]" type="search" placeholder="Поиск" @input="multiPages[field.code] = 1" />
+        </label>
+        <label v-for="option in visibleMultiOptions(field)" :key="option.id" class="multi-select-option">
           <input type="checkbox" :checked="isSelected(field, option.id)" :disabled="field.disabled" @change="toggleMulti(field, option.id, ($event.target as HTMLInputElement).checked)" />
           <span>{{ option.name }}</span>
         </label>
+        <button v-if="visibleMultiOptions(field).length < filteredMultiOptions(field).length" class="custom-select-more" type="button" @click="showMoreMulti(field)">
+          Показать еще
+        </button>
       </div>
 
       <div v-else-if="field.type === 'file'" class="file-field">

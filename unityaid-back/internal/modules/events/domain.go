@@ -121,5 +121,7 @@ type ShiftsResponse struct {
 	Items []Shift `json:"items"`
 }
 type FeedbackResponse struct {
-	Items []Feedback `json:"items"`
+	Items         []Feedback `json:"items"`
+	AverageRating float64    `json:"averageRating"`
+	FeedbackCount int        `json:"feedbackCount"`
 }

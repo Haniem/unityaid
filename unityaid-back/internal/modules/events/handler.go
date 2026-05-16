@@ -263,7 +263,26 @@ func (h *Handler) ListFeedback(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not load feedback"})
 		return
 	}
-	c.JSON(http.StatusOK, FeedbackResponse{Items: items})
+	average, count, err := h.service.FeedbackSummary(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not load feedback summary"})
+		return
+	}
+	if !h.canManageEvent(c, c.Param("id")) {
+		claims, ok := auth.GetClaims(c)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized", "message": "Authorization is required"})
+			return
+		}
+		ownItems := make([]Feedback, 0, 1)
+		for _, item := range items {
+			if item.UserID == claims.UserID {
+				ownItems = append(ownItems, item)
+			}
+		}
+		items = ownItems
+	}
+	c.JSON(http.StatusOK, FeedbackResponse{Items: items, AverageRating: average, FeedbackCount: count})
 }
 
 func (h *Handler) CreateFeedback(c *gin.Context) {
