@@ -67,6 +67,10 @@ func main() {
 	api.GET("/clients/:id/effective-config", service.getEffectiveConfig)
 	api.GET("/clients/:id/feature-flags", service.listFeatureFlags)
 	api.POST("/clients/:id/feature-flags", service.upsertFeatureFlag)
+	api.GET("/clients/:id/security-events", service.listSecurityEvents)
+	api.POST("/clients/:id/security-events", service.createSecurityEvent)
+	api.GET("/clients/:id/branding", service.getBranding)
+	api.PUT("/clients/:id/branding", service.upsertBranding)
 	api.GET("/clients/:id/environments", service.listEnvironments)
 	api.POST("/clients/:id/environments", service.createEnvironment)
 	api.GET("/clients/:id/domains", service.listDomains)
@@ -291,6 +295,7 @@ func (a *app) getEffectiveConfig(c *gin.Context) {
 		"client":       client,
 		"plan":         plan,
 		"featureFlags": flags,
+		"branding":     a.loadBrandingMap(c.Request.Context(), client["id"]),
 		"generatedAt":  time.Now().UTC(),
 	})
 }
@@ -330,6 +335,85 @@ func (a *app) upsertFeatureFlag(c *gin.Context) {
 	`, c.Param("id"), request.Code, request.IsEnabled, configJSON)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "feature_flag_error", "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"item": item})
+}
+
+func (a *app) listSecurityEvents(c *gin.Context) {
+	a.listChildRows(c, `
+		SELECT id::text, client_id::text, actor, action, target, metadata, created_at
+		FROM cp_security_events
+		WHERE client_id = $1
+		ORDER BY created_at DESC
+		LIMIT 200
+	`)
+}
+
+func (a *app) createSecurityEvent(c *gin.Context) {
+	var request securityEventRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": err.Error()})
+		return
+	}
+	request.normalize()
+	if request.Action == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": "action is required"})
+		return
+	}
+	metadataJSON := request.Metadata
+	if strings.TrimSpace(metadataJSON) == "" {
+		metadataJSON = "{}"
+	}
+	item, err := queryOne(c.Request.Context(), a.db, `
+		INSERT INTO cp_security_events (client_id, actor, action, target, metadata)
+		VALUES ($1, $2, $3, $4, $5::jsonb)
+		RETURNING id::text, client_id::text, actor, action, target, metadata, created_at
+	`, c.Param("id"), request.Actor, request.Action, request.Target, metadataJSON)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "security_event_error", "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"item": item})
+}
+
+func (a *app) getBranding(c *gin.Context) {
+	branding := a.loadBrandingMap(c.Request.Context(), c.Param("id"))
+	c.JSON(http.StatusOK, gin.H{"item": branding})
+}
+
+func (a *app) upsertBranding(c *gin.Context) {
+	var request brandingRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": err.Error()})
+		return
+	}
+	request.normalize()
+	item, err := queryOne(c.Request.Context(), a.db, `
+		INSERT INTO cp_branding_settings (
+			client_id, display_name, logo_url, primary_color, secondary_color, timezone, locale,
+			contact_email, contact_phone, certificate_signer_name, certificate_signer_title, public_pages
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb)
+		ON CONFLICT (client_id) DO UPDATE SET
+			display_name = EXCLUDED.display_name,
+			logo_url = EXCLUDED.logo_url,
+			primary_color = EXCLUDED.primary_color,
+			secondary_color = EXCLUDED.secondary_color,
+			timezone = EXCLUDED.timezone,
+			locale = EXCLUDED.locale,
+			contact_email = EXCLUDED.contact_email,
+			contact_phone = EXCLUDED.contact_phone,
+			certificate_signer_name = EXCLUDED.certificate_signer_name,
+			certificate_signer_title = EXCLUDED.certificate_signer_title,
+			public_pages = EXCLUDED.public_pages,
+			updated_at = now()
+		RETURNING id::text, client_id::text, display_name, logo_url, primary_color, secondary_color, timezone, locale,
+			contact_email, contact_phone, certificate_signer_name, certificate_signer_title, public_pages, created_at, updated_at
+	`, c.Param("id"), request.DisplayName, request.LogoURL, request.PrimaryColor, request.SecondaryColor, request.Timezone, request.Locale,
+		request.ContactEmail, request.ContactPhone, request.CertificateSignerName, request.CertificateSignerTitle, request.publicPagesJSON())
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "branding_error", "message": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"item": item})
@@ -704,6 +788,19 @@ func (a *app) loadClient(ctx context.Context, id string) (map[string]any, error)
 	`, id)
 }
 
+func (a *app) loadBrandingMap(ctx context.Context, clientID any) map[string]any {
+	item, err := queryOne(ctx, a.db, `
+		SELECT id::text, client_id::text, display_name, logo_url, primary_color, secondary_color, timezone, locale,
+			contact_email, contact_phone, certificate_signer_name, certificate_signer_title, public_pages, created_at, updated_at
+		FROM cp_branding_settings
+		WHERE client_id::text = $1
+	`, stringify(clientID))
+	if err != nil {
+		return map[string]any{}
+	}
+	return item
+}
+
 func (a *app) listChildRows(c *gin.Context, sql string) {
 	rows, err := a.db.Query(c.Request.Context(), sql, c.Param("id"))
 	if err != nil {
@@ -758,6 +855,55 @@ type featureFlagRequest struct {
 func (r *featureFlagRequest) normalize() {
 	r.Code = strings.TrimSpace(strings.ToLower(r.Code))
 	r.Config = strings.TrimSpace(r.Config)
+}
+
+type securityEventRequest struct {
+	Actor    string `json:"actor"`
+	Action   string `json:"action"`
+	Target   string `json:"target"`
+	Metadata string `json:"metadata"`
+}
+
+func (r *securityEventRequest) normalize() {
+	r.Actor = strings.TrimSpace(r.Actor)
+	r.Action = strings.TrimSpace(strings.ToLower(r.Action))
+	r.Target = strings.TrimSpace(r.Target)
+	r.Metadata = strings.TrimSpace(r.Metadata)
+}
+
+type brandingRequest struct {
+	DisplayName            string `json:"displayName"`
+	LogoURL                string `json:"logoUrl"`
+	PrimaryColor           string `json:"primaryColor"`
+	SecondaryColor         string `json:"secondaryColor"`
+	Timezone               string `json:"timezone"`
+	Locale                 string `json:"locale"`
+	ContactEmail           string `json:"contactEmail"`
+	ContactPhone           string `json:"contactPhone"`
+	CertificateSignerName  string `json:"certificateSignerName"`
+	CertificateSignerTitle string `json:"certificateSignerTitle"`
+	PublicPages            string `json:"publicPages"`
+}
+
+func (r *brandingRequest) normalize() {
+	r.DisplayName = strings.TrimSpace(r.DisplayName)
+	r.LogoURL = strings.TrimSpace(r.LogoURL)
+	r.PrimaryColor = strings.TrimSpace(r.PrimaryColor)
+	r.SecondaryColor = strings.TrimSpace(r.SecondaryColor)
+	r.Timezone = strings.TrimSpace(r.Timezone)
+	r.Locale = strings.TrimSpace(r.Locale)
+	r.ContactEmail = strings.TrimSpace(strings.ToLower(r.ContactEmail))
+	r.ContactPhone = strings.TrimSpace(r.ContactPhone)
+	r.CertificateSignerName = strings.TrimSpace(r.CertificateSignerName)
+	r.CertificateSignerTitle = strings.TrimSpace(r.CertificateSignerTitle)
+	r.PublicPages = strings.TrimSpace(r.PublicPages)
+}
+
+func (r *brandingRequest) publicPagesJSON() string {
+	if r.PublicPages == "" {
+		return "{}"
+	}
+	return r.PublicPages
 }
 
 type domainRequest struct {
@@ -923,6 +1069,13 @@ func queryOne(ctx context.Context, db *pgxpool.Pool, sql string, args ...any) (m
 	return items[0], nil
 }
 
+func stringify(value any) string {
+	if value == nil {
+		return ""
+	}
+	return strings.TrimSpace(value.(string))
+}
+
 func getEnv(key string, fallback string) string {
 	value := os.Getenv(key)
 	if value == "" {
@@ -1051,6 +1204,34 @@ CREATE TABLE IF NOT EXISTS cp_feature_flags (
 	UNIQUE (client_id, code)
 );
 
+CREATE TABLE IF NOT EXISTS cp_security_events (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	client_id UUID NOT NULL REFERENCES cp_clients(id) ON DELETE CASCADE,
+	actor TEXT NOT NULL DEFAULT '',
+	action TEXT NOT NULL DEFAULT '',
+	target TEXT NOT NULL DEFAULT '',
+	metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS cp_branding_settings (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	client_id UUID NOT NULL UNIQUE REFERENCES cp_clients(id) ON DELETE CASCADE,
+	display_name TEXT NOT NULL DEFAULT '',
+	logo_url TEXT NOT NULL DEFAULT '',
+	primary_color TEXT NOT NULL DEFAULT '#21966f',
+	secondary_color TEXT NOT NULL DEFAULT '#0f172a',
+	timezone TEXT NOT NULL DEFAULT 'UTC',
+	locale TEXT NOT NULL DEFAULT 'ru-RU',
+	contact_email TEXT NOT NULL DEFAULT '',
+	contact_phone TEXT NOT NULL DEFAULT '',
+	certificate_signer_name TEXT NOT NULL DEFAULT '',
+	certificate_signer_title TEXT NOT NULL DEFAULT '',
+	public_pages JSONB NOT NULL DEFAULT '{}'::jsonb,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS cp_migration_jobs (
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	client_id UUID NOT NULL REFERENCES cp_clients(id) ON DELETE CASCADE,
@@ -1098,6 +1279,9 @@ CREATE INDEX IF NOT EXISTS idx_cp_maintenance_windows_client_id ON cp_maintenanc
 CREATE INDEX IF NOT EXISTS idx_cp_deployments_client_id ON cp_deployments(client_id);
 CREATE INDEX IF NOT EXISTS idx_cp_backups_client_id ON cp_backups(client_id);
 CREATE INDEX IF NOT EXISTS idx_cp_feature_flags_client_id ON cp_feature_flags(client_id);
+CREATE INDEX IF NOT EXISTS idx_cp_security_events_client_id ON cp_security_events(client_id);
+CREATE INDEX IF NOT EXISTS idx_cp_security_events_action ON cp_security_events(action);
+CREATE INDEX IF NOT EXISTS idx_cp_branding_settings_client_id ON cp_branding_settings(client_id);
 CREATE INDEX IF NOT EXISTS idx_cp_migration_jobs_client_id ON cp_migration_jobs(client_id);
 CREATE INDEX IF NOT EXISTS idx_cp_health_checks_client_id ON cp_health_checks(client_id);
 CREATE INDEX IF NOT EXISTS idx_cp_health_checks_status ON cp_health_checks(status);

@@ -4,6 +4,8 @@ param(
   [string]$ClientSlug = "",
   [string]$EnvironmentId = "",
   [string]$CreatedBy = "backup.ps1",
+  [string]$EncryptionKey = "",
+  [switch]$Encrypt,
   [switch]$Register
 )
 
@@ -27,6 +29,26 @@ function Invoke-ControlPlaneJson($Method, $Path, $Body = $null) {
     $options.Body = ($Body | ConvertTo-Json -Depth 8)
   }
   return Invoke-RestMethod @options
+}
+
+function Protect-FileAes([string]$Path, [string]$KeyMaterial) {
+  $plainBytes = [System.IO.File]::ReadAllBytes($Path)
+  $sha = [System.Security.Cryptography.SHA256]::Create()
+  $keyBytes = $sha.ComputeHash([System.Text.Encoding]::UTF8.GetBytes($KeyMaterial))
+  $aes = [System.Security.Cryptography.Aes]::Create()
+  $aes.Key = $keyBytes
+  $aes.GenerateIV()
+  $aes.Mode = [System.Security.Cryptography.CipherMode]::CBC
+  $aes.Padding = [System.Security.Cryptography.PaddingMode]::PKCS7
+  $encryptor = $aes.CreateEncryptor()
+  $cipherBytes = $encryptor.TransformFinalBlock($plainBytes, 0, $plainBytes.Length)
+  $outPath = "$Path.enc"
+  [System.IO.File]::WriteAllBytes($outPath, $aes.IV + $cipherBytes)
+  $encryptor.Dispose()
+  $aes.Dispose()
+  $sha.Dispose()
+  Remove-Item -LiteralPath $Path -Force
+  return $outPath
 }
 
 $composeFile = Join-Path $PSScriptRoot "docker-compose.client.yml"
@@ -65,6 +87,23 @@ docker compose --env-file $envFile -f $composeFile exec -T db pg_dump -U $dbUser
 $targetMount = (Resolve-Path -LiteralPath $target).Path -replace "\\", "/"
 docker compose --env-file $envFile -f $composeFile run --rm --no-deps -v "${targetMount}:/backup" backend sh -c "cd /app && tar -czf /backup/uploads.tar.gz uploads"
 
+$databaseFile = "database.sql"
+$uploadsFile = "uploads.tar.gz"
+$encrypted = $false
+if ($Encrypt) {
+  if (!$EncryptionKey) {
+    $EncryptionKey = $envValues["BACKUP_ENCRYPTION_KEY"]
+  }
+  if (!$EncryptionKey) {
+    throw "EncryptionKey or BACKUP_ENCRYPTION_KEY is required when -Encrypt is used."
+  }
+  Protect-FileAes (Join-Path $target $databaseFile) $EncryptionKey | Out-Null
+  Protect-FileAes (Join-Path $target $uploadsFile) $EncryptionKey | Out-Null
+  $databaseFile = "database.sql.enc"
+  $uploadsFile = "uploads.tar.gz.enc"
+  $encrypted = $true
+}
+
 $secretPattern = "(PASSWORD|SECRET|TOKEN|KEY|DATABASE_URL|JWT)"
 $envSnapshot = Join-Path $target "env.snapshot"
 Get-Content $envFile | ForEach-Object {
@@ -85,8 +124,10 @@ $manifest = [ordered]@{
   createdAt = (Get-Date).ToUniversalTime().ToString("o")
   createdBy = $CreatedBy
   status = "succeeded"
-  databaseDump = "database.sql"
-  uploadsArchive = "uploads.tar.gz"
+  encrypted = $encrypted
+  encryption = if ($encrypted) { "aes-256-cbc-sha256-key" } else { "none" }
+  databaseDump = $databaseFile
+  uploadsArchive = $uploadsFile
   envSnapshot = "env.snapshot"
   sizeBytes = [int64]$sizeBytes
 }

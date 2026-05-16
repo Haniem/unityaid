@@ -43,6 +43,19 @@ The stack can receive commercial configuration from control plane:
 
 Run `deploy/control-plane/sync-client-config.ps1` to refresh these values from the client's plan, modules and feature flags.
 
+## Branding
+
+Branding values are stored in `.env.client` and can be refreshed from control plane:
+
+- `CLIENT_DISPLAY_NAME`;
+- `BRAND_PRIMARY_COLOR`;
+- `BRAND_SECONDARY_COLOR`;
+- `CLIENT_TIMEZONE`;
+- `CLIENT_LOCALE`;
+- `CLIENT_BRANDING_PATH`.
+
+Run `deploy/control-plane/sync-client-branding.ps1` to write `branding.json` and update environment values.
+
 ## Domain routing
 
 For public domains, generate a Caddy routing bundle from `deploy/control-plane`:
@@ -117,6 +130,13 @@ To register backup metadata in control plane:
 
 ```powershell
 .\backup.ps1 -ControlPlaneApiKey "change-me-control-plane-key" -Register
+```
+
+Encrypted backup:
+
+```powershell
+.\backup.ps1 -Encrypt
+.\restore.ps1 -BackupPath .\backups\20260517_120000 -EncryptionKey "secret-key"
 ```
 
 ## Export and import

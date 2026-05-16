@@ -69,6 +69,10 @@ Invoke-WebRequest `
 - `GET /api/v1/clients/{id}/effective-config`
 - `GET /api/v1/clients/{id}/feature-flags`
 - `POST /api/v1/clients/{id}/feature-flags`
+- `GET /api/v1/clients/{id}/security-events`
+- `POST /api/v1/clients/{id}/security-events`
+- `GET /api/v1/clients/{id}/branding`
+- `PUT /api/v1/clients/{id}/branding`
 - `GET /api/v1/clients/{id}/environments`
 - `POST /api/v1/clients/{id}/environments`
 - `GET /api/v1/clients/{id}/domains`
@@ -214,6 +218,34 @@ Invoke-RestMethod `
 
 ```powershell
 .\check-client-health.ps1 `
+  -ClientSlug dobrye-ruki `
+  -ControlPlaneApiKey "change-me-control-plane-key"
+```
+
+## Security operations
+
+Rotate per-client secrets and write a technical audit event:
+
+```powershell
+.\rotate-client-secret.ps1 `
+  -ClientSlug dobrye-ruki `
+  -SecretName JWT_SECRET `
+  -ControlPlaneApiKey "change-me-control-plane-key"
+```
+
+Client backup supports AES encryption:
+
+```powershell
+cd ..\clients\dobrye-ruki
+.\backup.ps1 -Encrypt -ControlPlaneApiKey "change-me-control-plane-key" -Register
+```
+
+## Branding
+
+Branding is stored in control plane and can be synchronized into a client stack:
+
+```powershell
+.\sync-client-branding.ps1 `
   -ClientSlug dobrye-ruki `
   -ControlPlaneApiKey "change-me-control-plane-key"
 ```

@@ -823,6 +823,20 @@ client-b/
 
 Цель: сделать архитектуру безопасной для реальных организаций.
 
+Статус: **готов MVP для security operations клиентского stack**.
+
+Реализовано:
+
+- отдельные секреты клиента генерируются в `.env.client`;
+- добавлен `BACKUP_ENCRYPTION_KEY`;
+- `backup.ps1 -Encrypt` шифрует database dump и uploads archive через AES;
+- `restore.ps1` умеет восстанавливать encrypted backup по ключу;
+- `rotate-client-secret.ps1` ротирует `JWT_SECRET` или `BACKUP_ENCRYPTION_KEY`;
+- таблица `cp_security_events`;
+- API для журнала технических действий platform admin/support;
+- ротация секрета пишет security event в control plane;
+- on-prem и client stack остаются изолированными по env/secrets.
+
 ### Нужно реализовать
 
 - отдельные секреты на клиента;
@@ -845,6 +859,18 @@ client-b/
 ## 20. Этап 12. On-prem поставка
 
 Цель: сделать коробочную версию естественным вариантом той же архитектуры.
+
+Статус: **готов MVP on-prem package builder**.
+
+Реализовано:
+
+- каталог `deploy/on-prem`;
+- `package-onprem.ps1` собирает поставочный пакет;
+- пакет включает client Docker Compose stack;
+- пакет включает `.env.client.example`, backup/restore, export/import и документацию;
+- пакет получает `manifest.json`;
+- on-prem README описывает установку на сервер клиента;
+- control plane доступ не требуется по умолчанию.
 
 ### Пакет поставки
 
@@ -876,6 +902,18 @@ client-b/
 ## 21. Этап 13. Клиентское брендирование и настройки
 
 Цель: дать каждому клиенту ощущение собственного продукта.
+
+Статус: **готов MVP клиентского брендирования через control plane config**.
+
+Реализовано:
+
+- таблица `cp_branding_settings`;
+- API `GET/PUT /clients/{id}/branding`;
+- branding включен в effective config клиента;
+- `sync-client-branding.ps1` пишет `branding.json` в client stack;
+- `.env.client` содержит display name, colors, timezone, locale и branding config path;
+- backend и worker получают branding env values;
+- настройки применяются только в конкретном клиентском stack.
 
 ### Настройки
 
