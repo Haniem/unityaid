@@ -510,6 +510,19 @@ client-b/
 
 Цель: каждый клиент получает собственный адрес.
 
+Статус: **готов MVP для доменной маршрутизации на Docker Compose/Caddy**.
+
+Реализовано:
+
+- таблица `cp_domains` в control plane;
+- API для списка и регистрации доменов клиента;
+- проверка уникальности домена на уровне control plane;
+- регистрация primary domain при создании клиента через `provision-client.ps1`;
+- генератор Caddy routing bundle `deploy/control-plane/generate-routing.ps1`;
+- генерация `Caddyfile` и `docker-compose.routing.yml` для домена клиента;
+- хранение `route_target`, `status`, `ssl_status` и признака primary domain;
+- CORS-настройки клиентского stack продолжают генерироваться из `PUBLIC_BASE_URL`.
+
 ### Варианты доменов
 
 - `client.unityaid.ru`;
@@ -535,6 +548,22 @@ client-b/
 ## 13. Этап 5. Версионирование и обновления клиентов
 
 Цель: управляемо обновлять отдельные клиентские окружения.
+
+Статус: **готов MVP для версионирования и dry-run обновлений клиентских stack**.
+
+Реализовано:
+
+- таблица `cp_versions` в control plane;
+- таблица `cp_maintenance_windows` в control plane;
+- API для версий клиента;
+- API для maintenance windows клиента;
+- версия приложения, release channel, backend image, frontend image и версия схемы БД в `.env.client`;
+- поддержка image tags в `docker-compose.client.yml`;
+- регистрация начальной версии при `provision-client.ps1 -Register`;
+- скрипт `deploy/control-plane/update-client.ps1`;
+- dry-run проверка compose-конфига перед обновлением;
+- запись deployment status в control plane после dry-run или реального обновления;
+- smoke-check локального клиента после реального обновления, если stack доступен через localhost.
 
 ### Нужно реализовать
 

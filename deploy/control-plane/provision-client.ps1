@@ -116,6 +116,13 @@ COMPOSE_PROJECT_NAME=$composeProject
 COMPOSE_PROFILES=$profilesValue
 
 APP_ENV=production
+APP_VERSION=$AppVersion
+RELEASE_CHANNEL=stable
+BACKEND_IMAGE=unityaid-backend:$AppVersion
+FRONTEND_IMAGE=unityaid-frontend:$AppVersion
+DB_SCHEMA_VERSION=$AppVersion
+BACKEND_BUILD_CONTEXT=../../../unityaid-back
+FRONTEND_BUILD_CONTEXT=../../../unityaid-front
 PUBLIC_BASE_URL=$publicBaseUrl
 FRONTEND_URL=$publicBaseUrl
 BACKEND_URL=$publicBaseUrl/api/v1
@@ -185,6 +192,29 @@ if ($Register) {
   }
 
   if ($clientId) {
+    if ($PrimaryDomain) {
+      $domainPayload = @{
+        domain = $PrimaryDomain
+        kind = "custom"
+        status = "planned"
+        sslStatus = "planned"
+        routeTarget = "localhost:$FrontendPort"
+        isPrimary = $true
+      }
+      Invoke-ControlPlaneJson "Post" "/api/v1/clients/$clientId/domains" $domainPayload | Out-Null
+    }
+
+    $versionPayload = @{
+      backendImage = "unityaid-backend:$AppVersion"
+      frontendImage = "unityaid-frontend:$AppVersion"
+      appVersion = $AppVersion
+      dbSchemaVersion = $AppVersion
+      releaseChannel = "stable"
+      status = if ($Start) { "deployed" } else { "planned" }
+      notes = "Initial client version registered by provision-client.ps1"
+    }
+    Invoke-ControlPlaneJson "Post" "/api/v1/clients/$clientId/versions" $versionPayload | Out-Null
+
     $environmentStatus = if ($Start) { "running" } else { "planned" }
     $environmentPayload = @{
       name = "production"

@@ -21,6 +21,28 @@ The stack creates:
 - production frontend served by nginx;
 - persistent uploads volume.
 
+## Version fields
+
+The stack keeps release metadata in `.env.client`:
+
+- `APP_VERSION`;
+- `RELEASE_CHANNEL`;
+- `BACKEND_IMAGE`;
+- `FRONTEND_IMAGE`;
+- `DB_SCHEMA_VERSION`.
+
+Control plane scripts use these fields to record planned and completed client updates.
+
+## Domain routing
+
+For public domains, generate a Caddy routing bundle from `deploy/control-plane`:
+
+```powershell
+.\generate-routing.ps1 -ClientSlug demo-client -Domain demo-client.example.org -FrontendTarget localhost:8088
+```
+
+Caddy handles HTTPS automatically after DNS points the domain to the routing host.
+
 ## Optional profiles
 
 Redis is disabled by default. To start it with the client stack, set this in `.env.client`:

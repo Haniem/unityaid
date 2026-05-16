@@ -17,8 +17,9 @@ services:
       retries: 10
 
   migrate:
+    image: ${BACKEND_IMAGE:-unityaid-backend:local}
     build:
-      context: ../../unityaid-back
+      context: ${BACKEND_BUILD_CONTEXT:-../../unityaid-back}
       dockerfile: Dockerfile.prod
     restart: "no"
     environment:
@@ -33,8 +34,9 @@ services:
         condition: service_healthy
 
   bootstrap-admin:
+    image: ${BACKEND_IMAGE:-unityaid-backend:local}
     build:
-      context: ../../unityaid-back
+      context: ${BACKEND_BUILD_CONTEXT:-../../unityaid-back}
       dockerfile: Dockerfile.prod
     restart: "no"
     environment:
@@ -57,8 +59,9 @@ services:
 
   seed:
     profiles: ["seed"]
+    image: ${BACKEND_IMAGE:-unityaid-backend:local}
     build:
-      context: ../../unityaid-back
+      context: ${BACKEND_BUILD_CONTEXT:-../../unityaid-back}
       dockerfile: Dockerfile.prod
     restart: "no"
     environment:
@@ -88,8 +91,9 @@ services:
       retries: 10
 
   backend:
+    image: ${BACKEND_IMAGE:-unityaid-backend:local}
     build:
-      context: ../../unityaid-back
+      context: ${BACKEND_BUILD_CONTEXT:-../../unityaid-back}
       dockerfile: Dockerfile.prod
     restart: unless-stopped
     environment:
@@ -119,8 +123,9 @@ services:
       start_period: 20s
 
   frontend:
+    image: ${FRONTEND_IMAGE:-unityaid-frontend:local}
     build:
-      context: ../../unityaid-front
+      context: ${FRONTEND_BUILD_CONTEXT:-../../unityaid-front}
       dockerfile: Dockerfile.prod
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}

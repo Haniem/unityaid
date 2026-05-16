@@ -68,6 +68,12 @@ Invoke-WebRequest `
 - `PATCH /api/v1/clients/{id}`
 - `GET /api/v1/clients/{id}/environments`
 - `POST /api/v1/clients/{id}/environments`
+- `GET /api/v1/clients/{id}/domains`
+- `POST /api/v1/clients/{id}/domains`
+- `GET /api/v1/clients/{id}/versions`
+- `POST /api/v1/clients/{id}/versions`
+- `GET /api/v1/clients/{id}/maintenance-windows`
+- `POST /api/v1/clients/{id}/maintenance-windows`
 - `GET /api/v1/clients/{id}/deployments`
 - `POST /api/v1/clients/{id}/deployments`
 - `GET /api/v1/clients/{id}/backups`
@@ -105,3 +111,39 @@ Example with immediate compose startup:
   -Register `
   -Start
 ```
+
+When `-PrimaryDomain` is provided with `-Register`, the provisioner also registers the primary domain and the initial version record in control plane.
+
+## Generate routing for a client domain
+
+`generate-routing.ps1` creates a Caddy-based routing bundle for a client domain. Caddy obtains and renews HTTPS certificates automatically when the domain points to the host.
+
+```powershell
+.\generate-routing.ps1 `
+  -ClientSlug dobrye-ruki `
+  -Domain volunteers.dobrye-ruki.example `
+  -FrontendTarget localhost:8188 `
+  -ControlPlaneApiKey "change-me-control-plane-key" `
+  -Register
+```
+
+The generated files are placed into `deploy/routing/{clientSlug}`:
+
+- `Caddyfile`;
+- `docker-compose.routing.yml`.
+
+## Update a client stack
+
+`update-client.ps1` records a target version, validates compose in dry-run mode, or rebuilds and restarts the client services.
+
+```powershell
+.\update-client.ps1 `
+  -ClientSlug dobrye-ruki `
+  -AppVersion "2026.05.17" `
+  -ReleaseChannel stable `
+  -ControlPlaneApiKey "change-me-control-plane-key" `
+  -Register `
+  -DryRun
+```
+
+Without `-DryRun`, the script rebuilds backend/frontend images, runs migration/bootstrap jobs, starts services, and writes a deployment entry with the final status.

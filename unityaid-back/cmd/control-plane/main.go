@@ -66,6 +66,12 @@ func main() {
 	api.PATCH("/clients/:id", service.updateClient)
 	api.GET("/clients/:id/environments", service.listEnvironments)
 	api.POST("/clients/:id/environments", service.createEnvironment)
+	api.GET("/clients/:id/domains", service.listDomains)
+	api.POST("/clients/:id/domains", service.createDomain)
+	api.GET("/clients/:id/versions", service.listVersions)
+	api.POST("/clients/:id/versions", service.createVersion)
+	api.GET("/clients/:id/maintenance-windows", service.listMaintenanceWindows)
+	api.POST("/clients/:id/maintenance-windows", service.createMaintenanceWindow)
 	api.POST("/clients/:id/deployments", service.createDeployment)
 	api.GET("/clients/:id/deployments", service.listDeployments)
 	api.POST("/clients/:id/backups", service.createBackup)
@@ -266,6 +272,135 @@ func (a *app) createEnvironment(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"item": item})
 }
 
+func (a *app) listDomains(c *gin.Context) {
+	a.listChildRows(c, `
+		SELECT id::text, client_id::text, domain, kind, status, ssl_status, route_target, is_primary, created_at, updated_at
+		FROM cp_domains
+		WHERE client_id = $1
+		ORDER BY is_primary DESC, created_at DESC
+	`)
+}
+
+func (a *app) createDomain(c *gin.Context) {
+	var request domainRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": err.Error()})
+		return
+	}
+	request.normalize()
+	if request.Domain == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": "domain is required"})
+		return
+	}
+	if request.Kind == "" {
+		request.Kind = "custom"
+	}
+	if request.Status == "" {
+		request.Status = "planned"
+	}
+	if request.SSLStatus == "" {
+		request.SSLStatus = "planned"
+	}
+	if request.IsPrimary {
+		_, _ = a.db.Exec(c.Request.Context(), `UPDATE cp_domains SET is_primary = false, updated_at = now() WHERE client_id = $1`, c.Param("id"))
+	}
+	item, err := queryOne(c.Request.Context(), a.db, `
+		INSERT INTO cp_domains (client_id, domain, kind, status, ssl_status, route_target, is_primary)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id::text, client_id::text, domain, kind, status, ssl_status, route_target, is_primary, created_at, updated_at
+	`, c.Param("id"), request.Domain, request.Kind, request.Status, request.SSLStatus, request.RouteTarget, request.IsPrimary)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "domain_error", "message": err.Error()})
+		return
+	}
+	if request.IsPrimary {
+		_, _ = a.db.Exec(c.Request.Context(), `UPDATE cp_clients SET primary_domain = $2, updated_at = now() WHERE id = $1`, c.Param("id"), request.Domain)
+	}
+	c.JSON(http.StatusCreated, gin.H{"item": item})
+}
+
+func (a *app) listVersions(c *gin.Context) {
+	a.listChildRows(c, `
+		SELECT id::text, client_id::text, backend_image, frontend_image, app_version, db_schema_version, release_channel, status, notes, created_at, updated_at
+		FROM cp_versions
+		WHERE client_id = $1
+		ORDER BY created_at DESC
+	`)
+}
+
+func (a *app) createVersion(c *gin.Context) {
+	var request versionRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": err.Error()})
+		return
+	}
+	request.normalize()
+	if request.AppVersion == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": "appVersion is required"})
+		return
+	}
+	if request.ReleaseChannel == "" {
+		request.ReleaseChannel = "stable"
+	}
+	if request.Status == "" {
+		request.Status = "planned"
+	}
+	item, err := queryOne(c.Request.Context(), a.db, `
+		INSERT INTO cp_versions (client_id, backend_image, frontend_image, app_version, db_schema_version, release_channel, status, notes)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING id::text, client_id::text, backend_image, frontend_image, app_version, db_schema_version, release_channel, status, notes, created_at, updated_at
+	`, c.Param("id"), request.BackendImage, request.FrontendImage, request.AppVersion, request.DBSchemaVersion, request.ReleaseChannel, request.Status, request.Notes)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "version_error", "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"item": item})
+}
+
+func (a *app) listMaintenanceWindows(c *gin.Context) {
+	a.listChildRows(c, `
+		SELECT id::text, client_id::text, name, weekday, starts_at, duration_minutes, timezone, is_active, created_at, updated_at
+		FROM cp_maintenance_windows
+		WHERE client_id = $1
+		ORDER BY weekday ASC, starts_at ASC
+	`)
+}
+
+func (a *app) createMaintenanceWindow(c *gin.Context) {
+	var request maintenanceWindowRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": err.Error()})
+		return
+	}
+	request.normalize()
+	if request.Name == "" {
+		request.Name = "Default maintenance"
+	}
+	if request.Weekday < 1 || request.Weekday > 7 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": "weekday must be between 1 and 7"})
+		return
+	}
+	if request.StartsAt == "" {
+		request.StartsAt = "22:00"
+	}
+	if request.DurationMinutes <= 0 {
+		request.DurationMinutes = 60
+	}
+	if request.Timezone == "" {
+		request.Timezone = "UTC"
+	}
+	item, err := queryOne(c.Request.Context(), a.db, `
+		INSERT INTO cp_maintenance_windows (client_id, name, weekday, starts_at, duration_minutes, timezone, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id::text, client_id::text, name, weekday, starts_at, duration_minutes, timezone, is_active, created_at, updated_at
+	`, c.Param("id"), request.Name, request.Weekday, request.StartsAt, request.DurationMinutes, request.Timezone, request.IsActive)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "maintenance_window_error", "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"item": item})
+}
+
 func (a *app) listDeployments(c *gin.Context) {
 	a.listChildRows(c, `
 		SELECT id::text, client_id::text, environment_id::text, version, status, triggered_by, log, started_at, finished_at
@@ -330,7 +465,7 @@ func (a *app) loadClient(ctx context.Context, id string) (map[string]any, error)
 	return queryOne(ctx, a.db, `
 		SELECT id::text, slug, name, status, plan_code, primary_domain, owner_email, modules, notes, created_at, updated_at
 		FROM cp_clients
-		WHERE id = $1 OR slug = $1
+		WHERE id::text = $1 OR slug = $1
 	`, id)
 }
 
@@ -377,6 +512,58 @@ type environmentRequest struct {
 	AppVersion  string `json:"appVersion"`
 	FrontendURL string `json:"frontendUrl"`
 	BackendURL  string `json:"backendUrl"`
+}
+
+type domainRequest struct {
+	Domain      string `json:"domain"`
+	Kind        string `json:"kind"`
+	Status      string `json:"status"`
+	SSLStatus   string `json:"sslStatus"`
+	RouteTarget string `json:"routeTarget"`
+	IsPrimary   bool   `json:"isPrimary"`
+}
+
+func (r *domainRequest) normalize() {
+	r.Domain = strings.TrimSpace(strings.ToLower(r.Domain))
+	r.Kind = strings.TrimSpace(strings.ToLower(r.Kind))
+	r.Status = strings.TrimSpace(strings.ToLower(r.Status))
+	r.SSLStatus = strings.TrimSpace(strings.ToLower(r.SSLStatus))
+	r.RouteTarget = strings.TrimSpace(r.RouteTarget)
+}
+
+type versionRequest struct {
+	BackendImage    string `json:"backendImage"`
+	FrontendImage   string `json:"frontendImage"`
+	AppVersion      string `json:"appVersion"`
+	DBSchemaVersion string `json:"dbSchemaVersion"`
+	ReleaseChannel  string `json:"releaseChannel"`
+	Status          string `json:"status"`
+	Notes           string `json:"notes"`
+}
+
+func (r *versionRequest) normalize() {
+	r.BackendImage = strings.TrimSpace(r.BackendImage)
+	r.FrontendImage = strings.TrimSpace(r.FrontendImage)
+	r.AppVersion = strings.TrimSpace(r.AppVersion)
+	r.DBSchemaVersion = strings.TrimSpace(r.DBSchemaVersion)
+	r.ReleaseChannel = strings.TrimSpace(strings.ToLower(r.ReleaseChannel))
+	r.Status = strings.TrimSpace(strings.ToLower(r.Status))
+	r.Notes = strings.TrimSpace(r.Notes)
+}
+
+type maintenanceWindowRequest struct {
+	Name            string `json:"name"`
+	Weekday         int    `json:"weekday"`
+	StartsAt        string `json:"startsAt"`
+	DurationMinutes int    `json:"durationMinutes"`
+	Timezone        string `json:"timezone"`
+	IsActive        bool   `json:"isActive"`
+}
+
+func (r *maintenanceWindowRequest) normalize() {
+	r.Name = strings.TrimSpace(r.Name)
+	r.StartsAt = strings.TrimSpace(r.StartsAt)
+	r.Timezone = strings.TrimSpace(r.Timezone)
 }
 
 type deploymentRequest struct {
@@ -492,6 +679,46 @@ CREATE TABLE IF NOT EXISTS cp_environments (
 	updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS cp_domains (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	client_id UUID NOT NULL REFERENCES cp_clients(id) ON DELETE CASCADE,
+	domain TEXT NOT NULL UNIQUE,
+	kind TEXT NOT NULL DEFAULT 'custom',
+	status TEXT NOT NULL DEFAULT 'planned',
+	ssl_status TEXT NOT NULL DEFAULT 'planned',
+	route_target TEXT NOT NULL DEFAULT '',
+	is_primary BOOLEAN NOT NULL DEFAULT false,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS cp_versions (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	client_id UUID NOT NULL REFERENCES cp_clients(id) ON DELETE CASCADE,
+	backend_image TEXT NOT NULL DEFAULT '',
+	frontend_image TEXT NOT NULL DEFAULT '',
+	app_version TEXT NOT NULL DEFAULT '',
+	db_schema_version TEXT NOT NULL DEFAULT '',
+	release_channel TEXT NOT NULL DEFAULT 'stable',
+	status TEXT NOT NULL DEFAULT 'planned',
+	notes TEXT NOT NULL DEFAULT '',
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS cp_maintenance_windows (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	client_id UUID NOT NULL REFERENCES cp_clients(id) ON DELETE CASCADE,
+	name TEXT NOT NULL DEFAULT 'Default maintenance',
+	weekday INTEGER NOT NULL DEFAULT 7,
+	starts_at TEXT NOT NULL DEFAULT '22:00',
+	duration_minutes INTEGER NOT NULL DEFAULT 60,
+	timezone TEXT NOT NULL DEFAULT 'UTC',
+	is_active BOOLEAN NOT NULL DEFAULT true,
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS cp_deployments (
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 	client_id UUID NOT NULL REFERENCES cp_clients(id) ON DELETE CASCADE,
@@ -529,6 +756,11 @@ CREATE TABLE IF NOT EXISTS cp_feature_flags (
 
 CREATE INDEX IF NOT EXISTS idx_cp_clients_status ON cp_clients(status);
 CREATE INDEX IF NOT EXISTS idx_cp_environments_client_id ON cp_environments(client_id);
+CREATE INDEX IF NOT EXISTS idx_cp_domains_client_id ON cp_domains(client_id);
+CREATE INDEX IF NOT EXISTS idx_cp_domains_status ON cp_domains(status);
+CREATE INDEX IF NOT EXISTS idx_cp_versions_client_id ON cp_versions(client_id);
+CREATE INDEX IF NOT EXISTS idx_cp_versions_channel ON cp_versions(release_channel);
+CREATE INDEX IF NOT EXISTS idx_cp_maintenance_windows_client_id ON cp_maintenance_windows(client_id);
 CREATE INDEX IF NOT EXISTS idx_cp_deployments_client_id ON cp_deployments(client_id);
 CREATE INDEX IF NOT EXISTS idx_cp_backups_client_id ON cp_backups(client_id);
 
