@@ -13,6 +13,7 @@ import (
 	"unityaid-back/internal/modules/auth"
 	"unityaid-back/internal/modules/certificates"
 	"unityaid-back/internal/modules/events"
+	"unityaid-back/internal/modules/fieldops"
 	"unityaid-back/internal/modules/files"
 	"unityaid-back/internal/modules/forms"
 	"unityaid-back/internal/modules/gamification"
@@ -175,6 +176,14 @@ func NewRouter(deps RouterDeps) http.Handler {
 	eventsGroup.GET("/:id/feedback", eventsHandler.ListFeedback)
 	eventsGroup.POST("/:id/feedback", eventsHandler.CreateFeedback)
 	eventsGroup.POST("/:id/complete", eventsHandler.Complete)
+
+	fieldOpsRepository := fieldops.NewRepository(deps.DB)
+	fieldOpsService := fieldops.NewService(fieldOpsRepository)
+	fieldOpsHandler := fieldops.NewHandler(fieldOpsService)
+
+	fieldOpsGroup := api.Group("/field-ops", authMiddleware, auditMiddleware)
+	fieldOpsGroup.POST("/events/:eventId/qr-tokens", canManageContent, fieldOpsHandler.CreateQRToken)
+	fieldOpsGroup.POST("/qr-scan", fieldOpsHandler.Scan)
 
 	timeEntriesRepository := timeentries.NewRepository(deps.DB)
 	timeEntriesService := timeentries.NewService(timeEntriesRepository, authorizer)

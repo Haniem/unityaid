@@ -3,3 +3,6 @@
 Папка для документов о развитии UnityAid как реального продукта.
 
 - `product_strategy.md` - позиционирование, целевая аудитория, коммерческая упаковка и направления развития.
+- `executive_dashboard.md` - панель руководителя, KPI и отчеты.
+- `sales_package.md` - коммерческое предложение, тарифы, калькулятор и demo story.
+- `sla_and_delivery.md` - SLA, managed SaaS и on-prem поставка.
