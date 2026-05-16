@@ -462,6 +462,22 @@ client-b/
 
 Цель: убрать ручной запуск клиентских stack.
 
+Статус: **готов MVP для Docker Compose provisioning**.
+
+Реализовано:
+
+- `deploy/control-plane/provision-client.ps1`;
+- генерация папки клиента в `deploy/clients/{clientSlug}`;
+- копирование шаблона `deploy/client`;
+- генерация `.env.client` с отдельными секретами, портами, доменом и bootstrap admin;
+- опциональное включение Redis;
+- опциональный запуск compose-stack;
+- опциональный запуск seed job;
+- регистрация клиента в control plane;
+- регистрация production environment в control plane;
+- регистрация deployment entry в control plane;
+- `deploy/clients/.gitkeep` для каталога с будущими клиентскими stack.
+
 ### Для Docker Compose
 
 - генерация папки клиента;

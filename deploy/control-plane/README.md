@@ -72,3 +72,36 @@ Invoke-WebRequest `
 - `POST /api/v1/clients/{id}/deployments`
 - `GET /api/v1/clients/{id}/backups`
 - `POST /api/v1/clients/{id}/backups`
+
+## Provision a client stack
+
+`provision-client.ps1` generates a standalone client folder from `deploy/client`, creates `.env.client`, optionally starts the stack, and optionally registers the client in control plane.
+
+Example without starting containers:
+
+```powershell
+.\provision-client.ps1 `
+  -ClientSlug dobrye-ruki `
+  -ClientName "Добрые руки" `
+  -OwnerEmail admin@dobrye-ruki.example `
+  -AdminPassword "ChangeMe123!" `
+  -PrimaryDomain dobrye-ruki.unityaid.example `
+  -ControlPlaneApiKey "change-me-control-plane-key" `
+  -Register
+```
+
+Example with immediate compose startup:
+
+```powershell
+.\provision-client.ps1 `
+  -ClientSlug demo-local `
+  -ClientName "Demo Local" `
+  -OwnerEmail admin@example.org `
+  -AdminPassword "ChangeMe123!" `
+  -FrontendPort 8188 `
+  -BackendPort 8180 `
+  -PostgresPort 55433 `
+  -ControlPlaneApiKey "change-me-control-plane-key" `
+  -Register `
+  -Start
+```
