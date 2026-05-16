@@ -342,6 +342,26 @@ client-b/
 
 Цель: создать стандартную упаковку окружения клиента.
 
+Статус: **готово для первого production-like compose-шаблона**.
+
+Реализовано:
+
+- `deploy/client/docker-compose.client.yml`;
+- `deploy/client/.env.client.example`;
+- `deploy/client/README.md`;
+- `deploy/client/start.ps1`;
+- `deploy/client/stop.ps1`;
+- `deploy/client/logs.ps1`;
+- `deploy/client/backup.ps1`;
+- `deploy/client/restore.ps1`;
+- `deploy/client/seed.ps1`;
+- migration job;
+- bootstrap admin job;
+- optional seed job через compose profile `seed`;
+- optional Redis через compose profile `redis`;
+- отдельные volumes для PostgreSQL, uploads и Redis;
+- production frontend на nginx с проксированием `/api` в backend.
+
 ### Docker Compose template
 
 Нужно подготовить шаблон:

@@ -55,6 +55,38 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  seed:
+    profiles: ["seed"]
+    build:
+      context: ../../unityaid-back
+      dockerfile: Dockerfile.prod
+    restart: "no"
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET}
+      RUN_SEEDS: "false"
+      UPLOADS_DIR: ${UPLOADS_DIR:-/app/uploads}
+    command: ["unityaid-seed"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  redis:
+    profiles: ["redis"]
+    image: redis:8-alpine
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--appendonly", "yes"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ../../unityaid-back
@@ -108,3 +140,4 @@ services:
 volumes:
   postgres_data:
   uploads_data:
+  redis_data:

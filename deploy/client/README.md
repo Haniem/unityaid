@@ -9,7 +9,7 @@ This folder contains the first production-oriented client stack template for the
 3. Start the stack:
 
 ```powershell
-docker compose --env-file .env.client -f docker-compose.client.yml up -d --build
+.\start.ps1
 ```
 
 The stack creates:
@@ -20,6 +20,28 @@ The stack creates:
 - backend API;
 - production frontend served by nginx;
 - persistent uploads volume.
+
+## Optional profiles
+
+Redis is disabled by default. To start it with the client stack, set this in `.env.client`:
+
+```text
+COMPOSE_PROFILES=redis
+```
+
+Demo seeds are not applied automatically for production client stacks. To load seed data explicitly, run:
+
+```powershell
+.\seed.ps1
+```
+
+## Operations
+
+```powershell
+.\start.ps1
+.\logs.ps1
+.\stop.ps1
+```
 
 ## Bootstrap admin
 
