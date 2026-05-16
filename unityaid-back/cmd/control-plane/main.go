@@ -64,6 +64,9 @@ func main() {
 	api.POST("/clients", service.createClient)
 	api.GET("/clients/:id", service.getClient)
 	api.PATCH("/clients/:id", service.updateClient)
+	api.GET("/clients/:id/effective-config", service.getEffectiveConfig)
+	api.GET("/clients/:id/feature-flags", service.listFeatureFlags)
+	api.POST("/clients/:id/feature-flags", service.upsertFeatureFlag)
 	api.GET("/clients/:id/environments", service.listEnvironments)
 	api.POST("/clients/:id/environments", service.createEnvironment)
 	api.GET("/clients/:id/domains", service.listDomains)
@@ -77,6 +80,12 @@ func main() {
 	api.POST("/clients/:id/backups", service.createBackup)
 	api.GET("/clients/:id/backups", service.listBackups)
 	api.POST("/clients/:id/backups/:backupId/restore", service.markBackupRestored)
+	api.GET("/clients/:id/migrations", service.listMigrationJobs)
+	api.POST("/clients/:id/migrations", service.createMigrationJob)
+	api.GET("/clients/:id/health-checks", service.listHealthChecks)
+	api.POST("/clients/:id/health-checks", service.createHealthCheck)
+	api.GET("/clients/:id/alerts", service.listAlerts)
+	api.POST("/clients/:id/alerts", service.createAlert)
 
 	server := &http.Server{
 		Addr:              ":" + port,
@@ -235,6 +244,92 @@ func (a *app) updateClient(c *gin.Context) {
 			status = http.StatusNotFound
 		}
 		c.JSON(status, gin.H{"error": "client_error", "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"item": item})
+}
+
+func (a *app) getEffectiveConfig(c *gin.Context) {
+	client, err := a.loadClient(c.Request.Context(), c.Param("id"))
+	if err != nil {
+		status := http.StatusInternalServerError
+		if err == pgx.ErrNoRows {
+			status = http.StatusNotFound
+		}
+		c.JSON(status, gin.H{"error": "client_error", "message": err.Error()})
+		return
+	}
+
+	plan, err := queryOne(c.Request.Context(), a.db, `
+		SELECT code, name, limits, features
+		FROM cp_plans
+		WHERE code = $1 AND is_active = true
+	`, client["plan_code"])
+	if err != nil && err != pgx.ErrNoRows {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "plan_error", "message": err.Error()})
+		return
+	}
+
+	rows, err := a.db.Query(c.Request.Context(), `
+		SELECT code, is_enabled, config
+		FROM cp_feature_flags
+		WHERE client_id = $1
+		ORDER BY code ASC
+	`, client["id"])
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "feature_flag_error", "message": err.Error()})
+		return
+	}
+	defer rows.Close()
+	flags, err := collectRows(rows)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "feature_flag_error", "message": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"client":       client,
+		"plan":         plan,
+		"featureFlags": flags,
+		"generatedAt":  time.Now().UTC(),
+	})
+}
+
+func (a *app) listFeatureFlags(c *gin.Context) {
+	a.listChildRows(c, `
+		SELECT id::text, client_id::text, code, is_enabled, config, created_at, updated_at
+		FROM cp_feature_flags
+		WHERE client_id = $1
+		ORDER BY code ASC
+	`)
+}
+
+func (a *app) upsertFeatureFlag(c *gin.Context) {
+	var request featureFlagRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": err.Error()})
+		return
+	}
+	request.normalize()
+	if request.Code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": "code is required"})
+		return
+	}
+	configJSON := request.Config
+	if strings.TrimSpace(configJSON) == "" {
+		configJSON = "{}"
+	}
+	item, err := queryOne(c.Request.Context(), a.db, `
+		INSERT INTO cp_feature_flags (client_id, code, is_enabled, config)
+		VALUES ($1, $2, $3, $4::jsonb)
+		ON CONFLICT (client_id, code) DO UPDATE SET
+			is_enabled = EXCLUDED.is_enabled,
+			config = EXCLUDED.config,
+			updated_at = now()
+		RETURNING id::text, client_id::text, code, is_enabled, config, created_at, updated_at
+	`, c.Param("id"), request.Code, request.IsEnabled, configJSON)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "feature_flag_error", "message": err.Error()})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"item": item})
@@ -483,6 +578,124 @@ func (a *app) markBackupRestored(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"item": item})
 }
 
+func (a *app) listMigrationJobs(c *gin.Context) {
+	a.listChildRows(c, `
+		SELECT id::text, client_id::text, kind, status, source, target, archive_path, log, created_by, created_at, finished_at
+		FROM cp_migration_jobs
+		WHERE client_id = $1
+		ORDER BY created_at DESC
+	`)
+}
+
+func (a *app) createMigrationJob(c *gin.Context) {
+	var request migrationJobRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": err.Error()})
+		return
+	}
+	request.normalize()
+	if request.Kind == "" {
+		request.Kind = "export"
+	}
+	if request.Status == "" {
+		request.Status = "planned"
+	}
+	item, err := queryOne(c.Request.Context(), a.db, `
+		INSERT INTO cp_migration_jobs (client_id, kind, status, source, target, archive_path, log, created_by, finished_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CASE WHEN $3 IN ('succeeded', 'failed') THEN now() ELSE NULL END)
+		RETURNING id::text, client_id::text, kind, status, source, target, archive_path, log, created_by, created_at, finished_at
+	`, c.Param("id"), request.Kind, request.Status, request.Source, request.Target, request.ArchivePath, request.Log, request.CreatedBy)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "migration_error", "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"item": item})
+}
+
+func (a *app) listHealthChecks(c *gin.Context) {
+	a.listChildRows(c, `
+		SELECT id::text, client_id::text, environment_id::text, component, status, response_ms, checked_at, details
+		FROM cp_health_checks
+		WHERE client_id = $1
+		ORDER BY checked_at DESC
+		LIMIT 200
+	`)
+}
+
+func (a *app) createHealthCheck(c *gin.Context) {
+	var request healthCheckRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": err.Error()})
+		return
+	}
+	request.normalize()
+	if request.Component == "" {
+		request.Component = "backend"
+	}
+	if request.Status == "" {
+		request.Status = "unknown"
+	}
+	detailsJSON := request.Details
+	if strings.TrimSpace(detailsJSON) == "" {
+		detailsJSON = "{}"
+	}
+	item, err := queryOne(c.Request.Context(), a.db, `
+		INSERT INTO cp_health_checks (client_id, environment_id, component, status, response_ms, details)
+		VALUES ($1, NULLIF($2, '')::uuid, $3, $4, $5, $6::jsonb)
+		RETURNING id::text, client_id::text, environment_id::text, component, status, response_ms, checked_at, details
+	`, c.Param("id"), request.EnvironmentID, request.Component, request.Status, request.ResponseMS, detailsJSON)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "health_check_error", "message": err.Error()})
+		return
+	}
+	if request.EnvironmentID != "" {
+		_, _ = a.db.Exec(c.Request.Context(), `
+			UPDATE cp_environments
+			SET health_status = $3, last_health_at = now(), updated_at = now()
+			WHERE client_id = $1 AND id = $2
+		`, c.Param("id"), request.EnvironmentID, request.Status)
+	}
+	c.JSON(http.StatusCreated, gin.H{"item": item})
+}
+
+func (a *app) listAlerts(c *gin.Context) {
+	a.listChildRows(c, `
+		SELECT id::text, client_id::text, environment_id::text, severity, status, title, message, created_at, resolved_at
+		FROM cp_alerts
+		WHERE client_id = $1
+		ORDER BY created_at DESC
+		LIMIT 200
+	`)
+}
+
+func (a *app) createAlert(c *gin.Context) {
+	var request alertRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "bad_request", "message": err.Error()})
+		return
+	}
+	request.normalize()
+	if request.Severity == "" {
+		request.Severity = "warning"
+	}
+	if request.Status == "" {
+		request.Status = "open"
+	}
+	if request.Title == "" {
+		request.Title = "Client environment alert"
+	}
+	item, err := queryOne(c.Request.Context(), a.db, `
+		INSERT INTO cp_alerts (client_id, environment_id, severity, status, title, message, resolved_at)
+		VALUES ($1, NULLIF($2, '')::uuid, $3, $4, $5, $6, CASE WHEN $4 = 'resolved' THEN now() ELSE NULL END)
+		RETURNING id::text, client_id::text, environment_id::text, severity, status, title, message, created_at, resolved_at
+	`, c.Param("id"), request.EnvironmentID, request.Severity, request.Status, request.Title, request.Message)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "alert_error", "message": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"item": item})
+}
+
 func (a *app) loadClient(ctx context.Context, id string) (map[string]any, error) {
 	return queryOne(ctx, a.db, `
 		SELECT id::text, slug, name, status, plan_code, primary_domain, owner_email, modules, notes, created_at, updated_at
@@ -534,6 +747,17 @@ type environmentRequest struct {
 	AppVersion  string `json:"appVersion"`
 	FrontendURL string `json:"frontendUrl"`
 	BackendURL  string `json:"backendUrl"`
+}
+
+type featureFlagRequest struct {
+	Code      string `json:"code"`
+	IsEnabled bool   `json:"isEnabled"`
+	Config    string `json:"config"`
+}
+
+func (r *featureFlagRequest) normalize() {
+	r.Code = strings.TrimSpace(strings.ToLower(r.Code))
+	r.Config = strings.TrimSpace(r.Config)
 }
 
 type domainRequest struct {
@@ -602,6 +826,57 @@ type backupRequest struct {
 	BackupPath    string `json:"backupPath"`
 	SizeBytes     int64  `json:"sizeBytes"`
 	CreatedBy     string `json:"createdBy"`
+}
+
+type migrationJobRequest struct {
+	Kind        string `json:"kind"`
+	Status      string `json:"status"`
+	Source      string `json:"source"`
+	Target      string `json:"target"`
+	ArchivePath string `json:"archivePath"`
+	Log         string `json:"log"`
+	CreatedBy   string `json:"createdBy"`
+}
+
+func (r *migrationJobRequest) normalize() {
+	r.Kind = strings.TrimSpace(strings.ToLower(r.Kind))
+	r.Status = strings.TrimSpace(strings.ToLower(r.Status))
+	r.Source = strings.TrimSpace(r.Source)
+	r.Target = strings.TrimSpace(r.Target)
+	r.ArchivePath = strings.TrimSpace(r.ArchivePath)
+	r.Log = strings.TrimSpace(r.Log)
+	r.CreatedBy = strings.TrimSpace(r.CreatedBy)
+}
+
+type healthCheckRequest struct {
+	EnvironmentID string `json:"environmentId"`
+	Component     string `json:"component"`
+	Status        string `json:"status"`
+	ResponseMS    int    `json:"responseMs"`
+	Details       string `json:"details"`
+}
+
+func (r *healthCheckRequest) normalize() {
+	r.EnvironmentID = strings.TrimSpace(r.EnvironmentID)
+	r.Component = strings.TrimSpace(strings.ToLower(r.Component))
+	r.Status = strings.TrimSpace(strings.ToLower(r.Status))
+	r.Details = strings.TrimSpace(r.Details)
+}
+
+type alertRequest struct {
+	EnvironmentID string `json:"environmentId"`
+	Severity      string `json:"severity"`
+	Status        string `json:"status"`
+	Title         string `json:"title"`
+	Message       string `json:"message"`
+}
+
+func (r *alertRequest) normalize() {
+	r.EnvironmentID = strings.TrimSpace(r.EnvironmentID)
+	r.Severity = strings.TrimSpace(strings.ToLower(r.Severity))
+	r.Status = strings.TrimSpace(strings.ToLower(r.Status))
+	r.Title = strings.TrimSpace(r.Title)
+	r.Message = strings.TrimSpace(r.Message)
 }
 
 func queryInt(c *gin.Context, key string, fallback int) int {
@@ -776,6 +1051,43 @@ CREATE TABLE IF NOT EXISTS cp_feature_flags (
 	UNIQUE (client_id, code)
 );
 
+CREATE TABLE IF NOT EXISTS cp_migration_jobs (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	client_id UUID NOT NULL REFERENCES cp_clients(id) ON DELETE CASCADE,
+	kind TEXT NOT NULL DEFAULT 'export',
+	status TEXT NOT NULL DEFAULT 'planned',
+	source TEXT NOT NULL DEFAULT '',
+	target TEXT NOT NULL DEFAULT '',
+	archive_path TEXT NOT NULL DEFAULT '',
+	log TEXT NOT NULL DEFAULT '',
+	created_by TEXT NOT NULL DEFAULT '',
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	finished_at TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS cp_health_checks (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	client_id UUID NOT NULL REFERENCES cp_clients(id) ON DELETE CASCADE,
+	environment_id UUID REFERENCES cp_environments(id) ON DELETE SET NULL,
+	component TEXT NOT NULL DEFAULT 'backend',
+	status TEXT NOT NULL DEFAULT 'unknown',
+	response_ms INTEGER NOT NULL DEFAULT 0,
+	checked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	details JSONB NOT NULL DEFAULT '{}'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS cp_alerts (
+	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+	client_id UUID NOT NULL REFERENCES cp_clients(id) ON DELETE CASCADE,
+	environment_id UUID REFERENCES cp_environments(id) ON DELETE SET NULL,
+	severity TEXT NOT NULL DEFAULT 'warning',
+	status TEXT NOT NULL DEFAULT 'open',
+	title TEXT NOT NULL DEFAULT '',
+	message TEXT NOT NULL DEFAULT '',
+	created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+	resolved_at TIMESTAMPTZ
+);
+
 CREATE INDEX IF NOT EXISTS idx_cp_clients_status ON cp_clients(status);
 CREATE INDEX IF NOT EXISTS idx_cp_environments_client_id ON cp_environments(client_id);
 CREATE INDEX IF NOT EXISTS idx_cp_domains_client_id ON cp_domains(client_id);
@@ -785,6 +1097,12 @@ CREATE INDEX IF NOT EXISTS idx_cp_versions_channel ON cp_versions(release_channe
 CREATE INDEX IF NOT EXISTS idx_cp_maintenance_windows_client_id ON cp_maintenance_windows(client_id);
 CREATE INDEX IF NOT EXISTS idx_cp_deployments_client_id ON cp_deployments(client_id);
 CREATE INDEX IF NOT EXISTS idx_cp_backups_client_id ON cp_backups(client_id);
+CREATE INDEX IF NOT EXISTS idx_cp_feature_flags_client_id ON cp_feature_flags(client_id);
+CREATE INDEX IF NOT EXISTS idx_cp_migration_jobs_client_id ON cp_migration_jobs(client_id);
+CREATE INDEX IF NOT EXISTS idx_cp_health_checks_client_id ON cp_health_checks(client_id);
+CREATE INDEX IF NOT EXISTS idx_cp_health_checks_status ON cp_health_checks(status);
+CREATE INDEX IF NOT EXISTS idx_cp_alerts_client_id ON cp_alerts(client_id);
+CREATE INDEX IF NOT EXISTS idx_cp_alerts_status ON cp_alerts(status);
 
 INSERT INTO cp_plans (code, name, monthly_price, limits, features)
 VALUES

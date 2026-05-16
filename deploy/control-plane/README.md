@@ -66,6 +66,9 @@ Invoke-WebRequest `
 - `POST /api/v1/clients`
 - `GET /api/v1/clients/{idOrSlug}`
 - `PATCH /api/v1/clients/{id}`
+- `GET /api/v1/clients/{id}/effective-config`
+- `GET /api/v1/clients/{id}/feature-flags`
+- `POST /api/v1/clients/{id}/feature-flags`
 - `GET /api/v1/clients/{id}/environments`
 - `POST /api/v1/clients/{id}/environments`
 - `GET /api/v1/clients/{id}/domains`
@@ -79,6 +82,12 @@ Invoke-WebRequest `
 - `GET /api/v1/clients/{id}/backups`
 - `POST /api/v1/clients/{id}/backups`
 - `POST /api/v1/clients/{id}/backups/{backupId}/restore`
+- `GET /api/v1/clients/{id}/migrations`
+- `POST /api/v1/clients/{id}/migrations`
+- `GET /api/v1/clients/{id}/health-checks`
+- `POST /api/v1/clients/{id}/health-checks`
+- `GET /api/v1/clients/{id}/alerts`
+- `POST /api/v1/clients/{id}/alerts`
 
 ## Provision a client stack
 
@@ -170,3 +179,41 @@ cd ..\clients\dobrye-ruki
 ```
 
 The backup entry stores status, size, path, creator, environment and restore timestamp.
+
+## Feature flags and limits
+
+Control plane exposes an effective client config that combines plan limits, plan features, client modules and manual feature flags:
+
+```powershell
+.\sync-client-config.ps1 `
+  -ClientSlug dobrye-ruki `
+  -ControlPlaneApiKey "change-me-control-plane-key"
+```
+
+The script writes `control-plane-config.json` into the client stack and updates:
+
+- `CONTROL_PLANE_CONFIG_PATH`;
+- `ENABLED_MODULES`;
+- `PLAN_LIMITS_JSON`.
+
+Feature flag example:
+
+```powershell
+$client = Invoke-RestMethod http://localhost:8090/api/v1/clients/dobrye-ruki -Headers @{ "X-Control-Plane-Key" = "change-me-control-plane-key" }
+Invoke-RestMethod `
+  "http://localhost:8090/api/v1/clients/$($client.item.id)/feature-flags" `
+  -Method Post `
+  -Headers @{ "X-Control-Plane-Key" = "change-me-control-plane-key" } `
+  -ContentType "application/json" `
+  -Body '{"code":"qr_checkin","isEnabled":true,"config":"{}"}'
+```
+
+## Monitoring
+
+`check-client-health.ps1` checks registered client environments and writes health-check records to control plane. Failed checks create open alerts.
+
+```powershell
+.\check-client-health.ps1 `
+  -ClientSlug dobrye-ruki `
+  -ControlPlaneApiKey "change-me-control-plane-key"
+```

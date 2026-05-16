@@ -105,6 +105,9 @@ services:
       RUN_SEEDS: ${RUN_SEEDS:-false}
       UPLOADS_DIR: ${UPLOADS_DIR:-/app/uploads}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      ENABLED_MODULES: ${ENABLED_MODULES:-}
+      PLAN_LIMITS_JSON: ${PLAN_LIMITS_JSON:-{}}
+      CONTROL_PLANE_CONFIG_PATH: ${CONTROL_PLANE_CONFIG_PATH:-/app/control-plane-config.json}
     ports:
       - "${BACKEND_PORT:-8080}:8080"
     volumes:
@@ -138,6 +141,9 @@ services:
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
       WORKER_QUEUE: ${WORKER_QUEUE:-default}
       WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-2}
+      ENABLED_MODULES: ${ENABLED_MODULES:-}
+      PLAN_LIMITS_JSON: ${PLAN_LIMITS_JSON:-{}}
+      CONTROL_PLANE_CONFIG_PATH: ${CONTROL_PLANE_CONFIG_PATH:-/app/control-plane-config.json}
     command: ["unityaid-worker"]
     volumes:
       - uploads_data:/app/uploads

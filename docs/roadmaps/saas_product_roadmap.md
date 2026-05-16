@@ -674,6 +674,19 @@ client-b/
 
 Цель: управлять коммерческими возможностями каждого клиента.
 
+Статус: **готов MVP для тарифов, лимитов и feature flags через control plane**.
+
+Реализовано:
+
+- тарифы и лимиты хранятся в `cp_plans`;
+- feature flags хранятся в `cp_feature_flags`;
+- API для списка и включения feature flags клиента;
+- API effective config клиента;
+- effective config объединяет plan limits, plan features, client modules и ручные flags;
+- `sync-client-config.ps1` синхронизирует config в клиентский stack;
+- `.env.client` хранит `CONTROL_PLANE_CONFIG_PATH`, `ENABLED_MODULES`, `PLAN_LIMITS_JSON`;
+- backend и worker получают эти значения через окружение.
+
 ### Лимиты
 
 - количество пользователей;
@@ -716,6 +729,18 @@ client-b/
 
 Цель: упростить внедрение и переход из ручного учета.
 
+Статус: **готов MVP для export/import архивов и учета migration jobs в control plane**.
+
+Реализовано:
+
+- таблица `cp_migration_jobs`;
+- API для списка и создания migration jobs;
+- `export-client.ps1` создает переносимый архив клиента;
+- архив содержит backup, `migration-manifest.json` и control plane config при наличии;
+- `import-client.ps1` восстанавливает клиент из migration archive;
+- экспорт/импорт могут регистрировать результат в control plane;
+- сценарий подходит для SaaS-to-on-prem, on-prem-to-SaaS и тестовой копии окружения на уровне MVP.
+
 ### Импорт
 
 - пользователи;
@@ -751,6 +776,19 @@ client-b/
 ## 18. Этап 10. Мониторинг и эксплуатация
 
 Цель: видеть состояние каждого клиентского stack.
+
+Статус: **готов MVP для health checks и alerts в control plane**.
+
+Реализовано:
+
+- таблица `cp_health_checks`;
+- таблица `cp_alerts`;
+- API для записи и просмотра health checks;
+- API для записи и просмотра alerts;
+- `check-client-health.ps1` проверяет backend health каждого окружения клиента;
+- health-check обновляет `health_status` и `last_health_at` у environment;
+- при неуспешной проверке создается open alert;
+- control plane хранит историю проверок по компонентам и окружениям.
 
 ### Метрики
 

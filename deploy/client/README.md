@@ -33,6 +33,16 @@ The stack keeps release metadata in `.env.client`:
 
 Control plane scripts use these fields to record planned and completed client updates.
 
+## Plan limits and modules
+
+The stack can receive commercial configuration from control plane:
+
+- `CONTROL_PLANE_CONFIG_PATH`;
+- `ENABLED_MODULES`;
+- `PLAN_LIMITS_JSON`.
+
+Run `deploy/control-plane/sync-client-config.ps1` to refresh these values from the client's plan, modules and feature flags.
+
 ## Domain routing
 
 For public domains, generate a Caddy routing bundle from `deploy/control-plane`:
@@ -107,6 +117,20 @@ To register backup metadata in control plane:
 
 ```powershell
 .\backup.ps1 -ControlPlaneApiKey "change-me-control-plane-key" -Register
+```
+
+## Export and import
+
+Create a migration archive:
+
+```powershell
+.\export-client.ps1 -ControlPlaneApiKey "change-me-control-plane-key" -Register
+```
+
+Restore from an archive:
+
+```powershell
+.\import-client.ps1 -ArchivePath .\exports\demo-client_20260517_120000
 ```
 
 ## Restore
