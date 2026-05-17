@@ -55,6 +55,11 @@ export const router = createRouter({
           component: SettingsPage
         },
         {
+          path: 'settings/:section',
+          name: 'settings-section',
+          component: SettingsPage
+        },
+        {
           path: 'admin',
           name: 'admin',
           component: AdminPanelPage
