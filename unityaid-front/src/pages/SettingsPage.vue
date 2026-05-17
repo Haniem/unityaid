@@ -36,12 +36,35 @@ type SettingsSection = {
 const route = useRoute()
 const users = ref<User[]>([])
 const roles = ref<SystemRole[]>([])
-const search = ref('')
+const userSearch = ref('')
+const settingsSearch = ref('')
 const selectedUserId = ref('')
 const selectedRoleIds = ref<string[]>([])
 const loadError = ref('')
 const saveMessage = ref('')
+const moduleSaveMessage = ref('')
 const isSaving = ref(false)
+const organizationSettings = ref({
+  displayName: 'UnityAid',
+  contactEmail: 'hello@unityaid.test',
+  timezone: 'Asia/Yekaterinburg',
+  defaultBranch: 'Главное подразделение',
+  membershipPolicy: 'manual'
+})
+const userRoleSettings = ref({
+  inviteMode: 'link',
+  defaultRole: 'volunteer',
+  registrationPolicy: 'invite_only',
+  defaultVolunteerStatus: 'new',
+  allowSelfRegistration: false
+})
+const eventSettings = ref({
+  defaultFormat: 'offline',
+  approvalMode: 'manual',
+  waitlistEnabled: true,
+  defaultCapacity: 25,
+  cancellationReason: 'Нет свободных мест'
+})
 
 const isSuperAdmin = computed(() => authState.user?.primaryRole === 'super_admin')
 const isClientAdmin = computed(() => ['super_admin', 'org_admin'].includes(authState.user?.primaryRole ?? ''))
@@ -146,9 +169,18 @@ const currentSectionId = computed(() => {
 const availableSections = computed(() => sections.filter((section) => hasAccess(section)))
 const selectedSection = computed(() => sections.find((section) => section.id === currentSectionId.value) || null)
 const selectedSectionAvailable = computed(() => selectedSection.value ? hasAccess(selectedSection.value) : true)
+const filteredSettingsSections = computed(() => {
+  const query = settingsSearch.value.trim().toLowerCase()
+  if (!query) return availableSections.value
+
+  return availableSections.value.filter((section) => {
+    const searchableText = [section.title, section.description, ...section.items].join(' ').toLowerCase()
+    return searchableText.includes(query)
+  })
+})
 
 const filteredUsers = computed(() => {
-  const query = search.value.trim().toLowerCase()
+  const query = userSearch.value.trim().toLowerCase()
   if (!query) return users.value
   return users.value.filter((user) => {
     const name = `${user.lastName} ${user.firstName} ${user.email}`.toLowerCase()
@@ -215,6 +247,10 @@ function roleNames(user: User) {
   return items.length ? items.map((role) => role.name).join(', ') : 'Роли не назначены'
 }
 
+function saveModuleSettings(sectionTitle: string) {
+  moduleSaveMessage.value = `Настройки раздела "${sectionTitle}" сохранены в черновике интерфейса`
+}
+
 onMounted(load)
 </script>
 
@@ -222,7 +258,12 @@ onMounted(load)
   <section class="page-section">
     <div class="page-heading">
       <div>
-        <p class="eyebrow">Настройки</p>
+        <nav v-if="selectedSection" class="settings-breadcrumbs" aria-label="Навигация настроек">
+          <RouterLink to="/settings">Настройки</RouterLink>
+          <ChevronRight :size="14" />
+          <span>{{ selectedSection.title }}</span>
+        </nav>
+        <p v-else class="eyebrow">Настройки</p>
         <h1>{{ selectedSection ? selectedSection.title : 'Администрирование клиента' }}</h1>
         <p>
           {{
@@ -238,9 +279,17 @@ onMounted(load)
       </RouterLink>
     </div>
 
-    <div v-if="!selectedSection" class="settings-catalog">
+    <template v-if="!selectedSection">
+      <div class="settings-toolbar">
+        <label class="search-field">
+          <Search :size="17" />
+          <input v-model="settingsSearch" type="search" placeholder="Найти настройки модуля" />
+        </label>
+      </div>
+
+      <div v-if="filteredSettingsSections.length > 0" class="settings-catalog">
       <RouterLink
-        v-for="section in availableSections"
+        v-for="section in filteredSettingsSections"
         :key="section.id"
         class="settings-card"
         :to="section.id === 'system-admin' ? '/admin' : `/settings/${section.id}`"
@@ -257,11 +306,69 @@ onMounted(load)
         </span>
         <ChevronRight :size="20" />
       </RouterLink>
-    </div>
+      </div>
+
+      <p v-else class="empty-state">По этому запросу настроек не найдено.</p>
+    </template>
 
     <div v-else-if="!selectedSectionAvailable" class="empty-state">
       У вас нет доступа к этому разделу настроек.
     </div>
+
+    <template v-else-if="selectedSection.id === 'organizations'">
+      <div class="settings-module-shell">
+        <section class="detail-panel settings-module-panel">
+          <span class="settings-card-icon">
+            <Building2 :size="26" />
+          </span>
+          <div>
+            <p class="eyebrow">Раздел настроек</p>
+            <h2>Организации</h2>
+            <p>Базовые параметры клиентского пространства, филиалов и правил членства.</p>
+          </div>
+        </section>
+
+        <section class="detail-panel">
+          <form class="settings-form settings-form-grid" @submit.prevent="saveModuleSettings('Организации')">
+            <label>
+              <span>Название пространства</span>
+              <input v-model="organizationSettings.displayName" type="text" />
+            </label>
+            <label>
+              <span>Контактный email</span>
+              <input v-model="organizationSettings.contactEmail" type="email" />
+            </label>
+            <label>
+              <span>Часовой пояс</span>
+              <select v-model="organizationSettings.timezone">
+                <option value="Asia/Yekaterinburg">Asia/Yekaterinburg</option>
+                <option value="Europe/Moscow">Europe/Moscow</option>
+                <option value="UTC">UTC</option>
+              </select>
+            </label>
+            <label>
+              <span>Подразделение по умолчанию</span>
+              <input v-model="organizationSettings.defaultBranch" type="text" />
+            </label>
+            <label class="settings-form-wide">
+              <span>Правило добавления участников</span>
+              <select v-model="organizationSettings.membershipPolicy">
+                <option value="manual">Только вручную администратором</option>
+                <option value="invite">По приглашению</option>
+                <option value="open">Открытая заявка с подтверждением</option>
+              </select>
+            </label>
+            <div class="form-actions settings-form-wide">
+              <button class="primary-action" type="submit">
+                <Save :size="17" />
+                <span>Сохранить настройки</span>
+              </button>
+            </div>
+          </form>
+        </section>
+        <p v-if="moduleSaveMessage" class="form-success">{{ moduleSaveMessage }}</p>
+      </div>
+    </template>
 
     <template v-else-if="selectedSection.id === 'users-roles'">
       <div class="settings-module-shell">
@@ -278,6 +385,54 @@ onMounted(load)
           </p>
         </div>
 
+        <section class="detail-panel">
+          <form class="settings-form settings-form-grid" @submit.prevent="saveModuleSettings('Пользователи и роли')">
+            <label>
+              <span>Режим приглашений</span>
+              <select v-model="userRoleSettings.inviteMode">
+                <option value="link">Одноразовая ссылка</option>
+                <option value="email">Email-приглашение</option>
+                <option value="manual">Ручное создание</option>
+              </select>
+            </label>
+            <label>
+              <span>Роль по умолчанию</span>
+              <select v-model="userRoleSettings.defaultRole">
+                <option value="volunteer">Волонтер</option>
+                <option value="coordinator">Координатор</option>
+                <option value="org_admin">Администратор организации</option>
+              </select>
+            </label>
+            <label>
+              <span>Политика регистрации</span>
+              <select v-model="userRoleSettings.registrationPolicy">
+                <option value="invite_only">Только по приглашению</option>
+                <option value="moderated">Саморегистрация с модерацией</option>
+                <option value="open">Открытая регистрация</option>
+              </select>
+            </label>
+            <label>
+              <span>Статус нового волонтера</span>
+              <select v-model="userRoleSettings.defaultVolunteerStatus">
+                <option value="new">Новый</option>
+                <option value="active">Активный</option>
+                <option value="unavailable">Недоступен</option>
+              </select>
+            </label>
+            <label class="toggle-field settings-form-wide">
+              <input v-model="userRoleSettings.allowSelfRegistration" type="checkbox" />
+              <span>Разрешить самостоятельную регистрацию волонтеров</span>
+            </label>
+            <div class="form-actions settings-form-wide">
+              <button class="primary-action" type="submit">
+                <Save :size="17" />
+                <span>Сохранить настройки</span>
+              </button>
+            </div>
+          </form>
+        </section>
+        <p v-if="moduleSaveMessage" class="form-success">{{ moduleSaveMessage }}</p>
+
         <p v-if="loadError" class="form-error">{{ loadError }}</p>
 
         <div v-if="isSuperAdmin" class="settings-layout">
@@ -290,7 +445,7 @@ onMounted(load)
             </div>
             <label class="search-field settings-search">
               <Search :size="17" />
-              <input v-model="search" type="search" placeholder="Поиск по имени или email" />
+              <input v-model="userSearch" type="search" placeholder="Поиск по имени или email" />
             </label>
             <div class="settings-user-list">
               <button
@@ -338,6 +493,61 @@ onMounted(load)
             <p v-if="saveMessage" class="form-success">{{ saveMessage }}</p>
           </section>
         </div>
+      </div>
+    </template>
+
+    <template v-else-if="selectedSection.id === 'events'">
+      <div class="settings-module-shell">
+        <section class="detail-panel settings-module-panel">
+          <span class="settings-card-icon">
+            <CalendarDays :size="26" />
+          </span>
+          <div>
+            <p class="eyebrow">Раздел настроек</p>
+            <h2>Мероприятия и заявки</h2>
+            <p>Правила создания мероприятий, обработки заявок, лимитов и листа ожидания.</p>
+          </div>
+        </section>
+
+        <section class="detail-panel">
+          <form class="settings-form settings-form-grid" @submit.prevent="saveModuleSettings('Мероприятия и заявки')">
+            <label>
+              <span>Формат мероприятия по умолчанию</span>
+              <select v-model="eventSettings.defaultFormat">
+                <option value="offline">Офлайн</option>
+                <option value="online">Онлайн</option>
+                <option value="hybrid">Гибрид</option>
+              </select>
+            </label>
+            <label>
+              <span>Обработка заявок</span>
+              <select v-model="eventSettings.approvalMode">
+                <option value="manual">Ручное подтверждение</option>
+                <option value="auto">Автоподтверждение при свободных местах</option>
+                <option value="rules">По правилам клиента</option>
+              </select>
+            </label>
+            <label>
+              <span>Лимит участников по умолчанию</span>
+              <input v-model.number="eventSettings.defaultCapacity" type="number" min="1" />
+            </label>
+            <label>
+              <span>Причина отказа по умолчанию</span>
+              <input v-model="eventSettings.cancellationReason" type="text" />
+            </label>
+            <label class="toggle-field settings-form-wide">
+              <input v-model="eventSettings.waitlistEnabled" type="checkbox" />
+              <span>Включить лист ожидания при заполненном лимите</span>
+            </label>
+            <div class="form-actions settings-form-wide">
+              <button class="primary-action" type="submit">
+                <Save :size="17" />
+                <span>Сохранить настройки</span>
+              </button>
+            </div>
+          </form>
+        </section>
+        <p v-if="moduleSaveMessage" class="form-success">{{ moduleSaveMessage }}</p>
       </div>
     </template>
 

@@ -2625,6 +2625,24 @@ a {
   margin-top: 18px;
 }
 
+.settings-toolbar {
+  margin-bottom: 18px;
+}
+
+.settings-breadcrumbs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: #7b849a;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.settings-breadcrumbs a {
+  color: var(--accent);
+}
+
 .settings-catalog {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2717,6 +2735,25 @@ a {
 
 .settings-module-panel p {
   margin: 0;
+}
+
+.settings-form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-form-wide {
+  grid-column: 1 / -1;
+}
+
+.settings-form .toggle-field {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+.settings-form .toggle-field input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
 }
 
 .volunteer-card-head {
@@ -2842,6 +2879,7 @@ a {
   .management-grid,
   .settings-catalog,
   .settings-layout,
+  .settings-form-grid,
   .time-layout,
   .certificate-layout,
   .admin-layout,
