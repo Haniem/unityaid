@@ -12,7 +12,7 @@ import (
 func (r *Repository) ListApplications(ctx context.Context, eventID string) ([]Application, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT ea.id::text, ea.event_id::text, ea.user_id::text, concat_ws(' ', u.last_name, u.first_name), u.email,
-			ea.status::text, ea.message, ea.created_at, ea.updated_at
+			ea.status::text, ea.message, COALESCE(ea.rejection_reason, ''), ea.created_at, ea.updated_at
 		FROM event_applications ea
 		JOIN users u ON u.id = ea.user_id
 		WHERE ea.event_id = $1
@@ -25,7 +25,7 @@ func (r *Repository) ListApplications(ctx context.Context, eventID string) ([]Ap
 	items := []Application{}
 	for rows.Next() {
 		var item Application
-		if err := rows.Scan(&item.ID, &item.EventID, &item.UserID, &item.UserName, &item.Email, &item.Status, &item.Message, &item.CreatedAt, &item.UpdatedAt); err != nil {
+		if err := rows.Scan(&item.ID, &item.EventID, &item.UserID, &item.UserName, &item.Email, &item.Status, &item.Message, &item.RejectionReason, &item.CreatedAt, &item.UpdatedAt); err != nil {
 			return nil, err
 		}
 		items = append(items, item)
@@ -34,6 +34,14 @@ func (r *Repository) ListApplications(ctx context.Context, eventID string) ([]Ap
 }
 
 func (r *Repository) CreateApplication(ctx context.Context, eventID string, userID string, message string) (Application, error) {
+	var existingID string
+	err := r.db.QueryRow(ctx, `SELECT id::text FROM event_applications WHERE event_id = $1 AND user_id = $2`, eventID, userID).Scan(&existingID)
+	if err == nil {
+		return Application{}, ErrAlreadyExists
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return Application{}, err
+	}
 	status, err := r.nextApplicationStatus(ctx, eventID)
 	if err != nil {
 		return Application{}, err
@@ -42,7 +50,6 @@ func (r *Repository) CreateApplication(ctx context.Context, eventID string, user
 	err = r.db.QueryRow(ctx, `
 		INSERT INTO event_applications (event_id, user_id, status, message)
 		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (event_id, user_id) DO UPDATE SET message = EXCLUDED.message, updated_at = now()
 		RETURNING id::text
 	`, eventID, userID, status, message).Scan(&id)
 	if err != nil {
@@ -51,15 +58,68 @@ func (r *Repository) CreateApplication(ctx context.Context, eventID string, user
 	return r.findApplication(ctx, eventID, id)
 }
 
-func (r *Repository) UpdateApplicationStatus(ctx context.Context, eventID string, applicationID string, status string) (Application, error) {
-	tag, err := r.db.Exec(ctx, `UPDATE event_applications SET status = $3, updated_at = now() WHERE event_id = $1 AND id = $2`, eventID, applicationID, normalizeApplicationStatus(status))
+func (r *Repository) UpdateApplicationStatus(ctx context.Context, eventID string, applicationID string, status string, rejectionReason string) (Application, error) {
+	normalized := normalizeApplicationStatus(status)
+	tag, err := r.db.Exec(ctx, `
+		UPDATE event_applications
+		SET status = $3,
+			rejection_reason = CASE WHEN $3 = 'rejected' THEN $4 ELSE '' END,
+			updated_at = now()
+		WHERE event_id = $1 AND id = $2
+	`, eventID, applicationID, normalized, rejectionReason)
 	if err != nil {
 		return Application{}, err
 	}
 	if tag.RowsAffected() == 0 {
 		return Application{}, ErrNotFound
 	}
+	if normalized == "approved" {
+		if err := r.RebalanceWaitlist(ctx, eventID); err != nil {
+			return Application{}, err
+		}
+	}
 	return r.findApplication(ctx, eventID, applicationID)
+}
+
+func (r *Repository) BulkUpdateApplications(ctx context.Context, eventID string, request BulkApplicationStatusRequest) ([]Application, error) {
+	normalized := normalizeApplicationStatus(request.Status)
+	rows, err := r.db.Query(ctx, `
+		UPDATE event_applications
+		SET status = $3,
+			rejection_reason = CASE WHEN $3 = 'rejected' THEN $4 ELSE '' END,
+			updated_at = now()
+		WHERE event_id = $1 AND id::text = ANY($2::text[])
+		RETURNING id::text
+	`, eventID, request.ApplicationIDs, normalized, request.RejectionReason)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if normalized == "approved" {
+		if err := r.RebalanceWaitlist(ctx, eventID); err != nil {
+			return nil, err
+		}
+	}
+	items := make([]Application, 0, len(ids))
+	for _, id := range ids {
+		item, err := r.findApplication(ctx, eventID, id)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
 }
 
 func (r *Repository) DeleteApplication(ctx context.Context, eventID string, applicationID string) error {
@@ -148,6 +208,29 @@ func (r *Repository) MarkAttendance(ctx context.Context, eventID string, req Att
 		}
 	}
 	return Attendance{}, ErrNotFound
+}
+
+func (r *Repository) BulkMarkAttendance(ctx context.Context, eventID string, req BulkAttendanceRequest) ([]Attendance, error) {
+	event, err := r.FindByID(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+	hours := req.Hours
+	if hours <= 0 {
+		hours = event.EndsAt.Sub(event.StartsAt).Hours()
+	}
+	for _, userID := range req.UserIDs {
+		_, err := r.db.Exec(ctx, `
+			INSERT INTO event_attendance (event_id, user_id, check_in_at, hours)
+			VALUES ($1, $2, now(), $3)
+			ON CONFLICT (event_id, user_id)
+			DO UPDATE SET check_in_at = COALESCE(event_attendance.check_in_at, now()), hours = EXCLUDED.hours, updated_at = now()
+		`, eventID, userID, hours)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return r.ListAttendance(ctx, eventID)
 }
 
 func (r *Repository) UpdateAttendance(ctx context.Context, eventID string, attendanceID string, hours *float64, checkOutAt *time.Time) (Attendance, error) {
@@ -271,7 +354,20 @@ func (r *Repository) CreateFeedback(ctx context.Context, eventID, userID string,
 }
 
 func (r *Repository) CompleteEvent(ctx context.Context, eventID string) error {
-	_, err := r.db.Exec(ctx, `
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	var status string
+	if err := tx.QueryRow(ctx, `SELECT status::text FROM events WHERE id = $1 FOR UPDATE`, eventID).Scan(&status); err != nil {
+		return err
+	}
+	if status == "completed" {
+		return tx.Commit(ctx)
+	}
+	_, err = tx.Exec(ctx, `
 		UPDATE events SET status = 'completed', updated_at = now() WHERE id = $1;
 		UPDATE volunteer_profiles vp
 		SET total_hours = vp.total_hours + a.hours, updated_at = now()
@@ -281,21 +377,80 @@ func (r *Repository) CompleteEvent(ctx context.Context, eventID string) error {
 		FROM event_attendance a
 		WHERE a.event_id = $1;
 	`, eventID)
-	return err
+	if err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (r *Repository) findApplication(ctx context.Context, eventID string, applicationID string) (Application, error) {
 	var item Application
 	err := r.db.QueryRow(ctx, `
 		SELECT ea.id::text, ea.event_id::text, ea.user_id::text, concat_ws(' ', u.last_name, u.first_name), u.email,
-			ea.status::text, ea.message, ea.created_at, ea.updated_at
+			ea.status::text, ea.message, COALESCE(ea.rejection_reason, ''), ea.created_at, ea.updated_at
 		FROM event_applications ea JOIN users u ON u.id = ea.user_id
 		WHERE ea.event_id = $1 AND ea.id = $2
-	`, eventID, applicationID).Scan(&item.ID, &item.EventID, &item.UserID, &item.UserName, &item.Email, &item.Status, &item.Message, &item.CreatedAt, &item.UpdatedAt)
+	`, eventID, applicationID).Scan(&item.ID, &item.EventID, &item.UserID, &item.UserName, &item.Email, &item.Status, &item.Message, &item.RejectionReason, &item.CreatedAt, &item.UpdatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Application{}, ErrNotFound
 	}
 	return item, err
+}
+
+func (r *Repository) RebalanceWaitlist(ctx context.Context, eventID string) error {
+	var maxParticipants sql.NullInt32
+	if err := r.db.QueryRow(ctx, `SELECT max_participants FROM events WHERE id = $1`, eventID).Scan(&maxParticipants); err != nil {
+		return err
+	}
+	if !maxParticipants.Valid {
+		_, err := r.db.Exec(ctx, `
+			UPDATE event_applications
+			SET status = 'pending', updated_at = now()
+			WHERE event_id = $1 AND status = 'waitlisted'
+		`, eventID)
+		return err
+	}
+	rows, err := r.db.Query(ctx, `
+		SELECT id::text
+		FROM event_applications
+		WHERE event_id = $1 AND status IN ('approved', 'waitlisted')
+		ORDER BY
+			CASE status WHEN 'approved' THEN 0 ELSE 1 END,
+			created_at
+	`, eventID)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	approvedIDs := []string{}
+	waitlistedIDs := []string{}
+	index := 0
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return err
+		}
+		if index < int(maxParticipants.Int32) {
+			approvedIDs = append(approvedIDs, id)
+		} else {
+			waitlistedIDs = append(waitlistedIDs, id)
+		}
+		index++
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(approvedIDs) > 0 {
+		if _, err := r.db.Exec(ctx, `UPDATE event_applications SET status = 'approved', updated_at = now() WHERE event_id = $1 AND id::text = ANY($2::text[])`, eventID, approvedIDs); err != nil {
+			return err
+		}
+	}
+	if len(waitlistedIDs) > 0 {
+		if _, err := r.db.Exec(ctx, `UPDATE event_applications SET status = 'waitlisted', updated_at = now() WHERE event_id = $1 AND id::text = ANY($2::text[])`, eventID, waitlistedIDs); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (r *Repository) nextApplicationStatus(ctx context.Context, eventID string) (string, error) {

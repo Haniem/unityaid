@@ -11,6 +11,7 @@ import (
 )
 
 var ErrNotFound = errors.New("event not found")
+var ErrAlreadyExists = errors.New("event application already exists")
 
 type Repository struct {
 	db *pgxpool.Pool
@@ -59,6 +60,10 @@ func (r *Repository) Create(ctx context.Context, request UpsertRequest, startsAt
 }
 
 func (r *Repository) Update(ctx context.Context, id string, request UpsertRequest, startsAt time.Time, endsAt time.Time) (Event, error) {
+	existing, err := r.FindByID(ctx, id)
+	if err != nil {
+		return Event{}, err
+	}
 	tag, err := r.db.Exec(ctx, `
 		UPDATE events
 		SET organization_id = $2,
@@ -78,6 +83,11 @@ func (r *Repository) Update(ctx context.Context, id string, request UpsertReques
 	}
 	if tag.RowsAffected() == 0 {
 		return Event{}, ErrNotFound
+	}
+	if existing.MaxParticipants == nil || request.MaxParticipants == nil || *existing.MaxParticipants != *request.MaxParticipants {
+		if err := r.RebalanceWaitlist(ctx, id); err != nil {
+			return Event{}, err
+		}
 	}
 	return r.FindByID(ctx, id)
 }

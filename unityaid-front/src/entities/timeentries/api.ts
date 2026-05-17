@@ -32,3 +32,6 @@ export const approveTimeEntry = (id: string) =>
 
 export const rejectTimeEntry = (id: string) =>
   apiRequest<{ item: TimeEntry }>(`/time-entries/${id}/reject`, { method: 'POST', token: token() })
+
+export const bulkApproveTimeEntries = (ids: string[]) =>
+  apiRequest<{ items: TimeEntry[] }>('/time-entries/bulk-approve', { method: 'POST', token: token(), body: JSON.stringify({ ids }) })

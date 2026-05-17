@@ -37,3 +37,7 @@ type UpsertRequest struct {
 type ListResponse struct {
 	Items []TimeEntry `json:"items"`
 }
+
+type BulkReviewRequest struct {
+	IDs []string `json:"ids" binding:"required"`
+}

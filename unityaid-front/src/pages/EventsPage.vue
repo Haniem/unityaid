@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { Eye, MapPin, Pencil, Plus, Trash2 } from 'lucide-vue-next'
-import { createEvent, deleteEvent, fetchEvents, updateEvent } from '../entities/events/api'
-import type { EventItem, EventPayload } from '../entities/events/types'
+import { createEvent, createEventTemplate, createRecurringEvents, deleteEvent, fetchEventTemplates, fetchEvents, updateEvent } from '../entities/events/api'
+import type { EventItem, EventPayload, EventTemplate } from '../entities/events/types'
 import { fetchCreateForm, fetchEditForm } from '../entities/forms/api'
 import type { BackendForm, FormModel } from '../entities/forms/types'
 import DynamicForm from '../shared/ui/DynamicForm.vue'
@@ -12,11 +12,18 @@ import { formatDateTime } from '../shared/date'
 import { useClientPagination } from '../shared/pagination'
 
 const items = ref<EventItem[]>([])
+const templates = ref<EventTemplate[]>([])
 const editingId = ref<string | null>(null)
 const isModalOpen = ref(false)
 const errorMessage = ref('')
 const formSchema = ref<BackendForm | null>(null)
 const formModel = ref<FormModel>({})
+const selectedTemplateId = ref('')
+const saveAsTemplate = ref(false)
+const templateName = ref('')
+const isRecurring = ref(false)
+const recurringFrequency = ref('weekly')
+const recurringCount = ref(1)
 const { page, perPage, pageItems } = useClientPagination(items, 10)
 
 function resetForm() {
@@ -24,6 +31,12 @@ function resetForm() {
   formSchema.value = null
   formModel.value = {}
   errorMessage.value = ''
+  selectedTemplateId.value = ''
+  saveAsTemplate.value = false
+  templateName.value = ''
+  isRecurring.value = false
+  recurringFrequency.value = 'weekly'
+  recurringCount.value = 1
 }
 
 async function openCreateModal() {
@@ -60,19 +73,49 @@ function payload(): EventPayload {
 }
 
 async function load() {
-  items.value = (await fetchEvents()).items
+  const [eventsResponse, templatesResponse] = await Promise.all([fetchEvents(), fetchEventTemplates().catch(() => ({ items: [] }))])
+  items.value = eventsResponse.items
+  templates.value = templatesResponse.items
 }
 
 async function submit() {
   errorMessage.value = ''
   try {
-    if (editingId.value) await updateEvent(editingId.value, payload())
-    else await createEvent(payload())
+    const eventPayload = payload()
+    if (editingId.value) await updateEvent(editingId.value, eventPayload)
+    else if (isRecurring.value) {
+      await createRecurringEvents({ event: eventPayload, frequency: recurringFrequency.value, count: recurringCount.value })
+    } else {
+      await createEvent(eventPayload)
+    }
+    if (saveAsTemplate.value && templateName.value.trim()) {
+      await createEventTemplate({
+        organizationId: eventPayload.organizationId,
+        name: templateName.value.trim(),
+        title: eventPayload.title,
+        description: eventPayload.description,
+        format: eventPayload.format,
+        location: eventPayload.location,
+        maxParticipants: eventPayload.maxParticipants,
+        defaultDurationMinutes: 120
+      })
+    }
     closeModal()
     await load()
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось сохранить мероприятие'
   }
+}
+
+function applyTemplate() {
+  const template = templates.value.find((item) => item.id === selectedTemplateId.value)
+  if (!template) return
+  formModel.value.organizationId = template.organizationId
+  formModel.value.title = template.title
+  formModel.value.description = template.description
+  formModel.value.format = template.format
+  formModel.value.location = template.location ?? ''
+  formModel.value.maxParticipants = template.maxParticipants ?? ''
 }
 
 async function remove(item: EventItem) {
@@ -123,6 +166,38 @@ onMounted(load)
         <h2>{{ formSchema?.meta.title || (editingId ? 'Редактирование мероприятия' : 'Новое мероприятие') }}</h2>
         <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
         <DynamicForm v-if="formSchema" v-model="formModel" :form="formSchema" />
+        <div v-if="!editingId" class="event-planning-tools">
+          <label v-if="templates.length">
+            <span>Шаблон</span>
+            <select v-model="selectedTemplateId" @change="applyTemplate">
+              <option value="">Без шаблона</option>
+              <option v-for="template in templates" :key="template.id" :value="template.id">{{ template.name }}</option>
+            </select>
+          </label>
+          <label class="toggle-field inline-toggle">
+            <input v-model="isRecurring" type="checkbox" />
+            <span>Повторяющееся мероприятие</span>
+          </label>
+          <div v-if="isRecurring" class="recurring-grid">
+            <label>
+              <span>Периодичность</span>
+              <select v-model="recurringFrequency">
+                <option value="weekly">Еженедельно</option>
+                <option value="monthly">Ежемесячно</option>
+                <option value="daily">Ежедневно</option>
+              </select>
+            </label>
+            <label>
+              <span>Количество</span>
+              <input v-model.number="recurringCount" type="number" min="1" max="24" />
+            </label>
+          </div>
+          <label class="toggle-field inline-toggle">
+            <input v-model="saveAsTemplate" type="checkbox" />
+            <span>Сохранить как шаблон</span>
+          </label>
+          <input v-if="saveAsTemplate" v-model="templateName" placeholder="Название шаблона" />
+        </div>
         <div class="form-actions">
           <button class="secondary-action" type="button" @click="closeModal">Отмена</button>
           <button class="primary-action" type="submit">Сохранить</button>

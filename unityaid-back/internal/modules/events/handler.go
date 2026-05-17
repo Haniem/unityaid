@@ -58,6 +58,24 @@ func (h *Handler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"item": item})
 }
 
+func (h *Handler) CreateRecurring(c *gin.Context) {
+	var request RecurringEventRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+	claims, _ := auth.GetClaims(c)
+	if !h.requireCanManageContent(c, request.EventPayload.OrganizationID) {
+		return
+	}
+	items, err := h.service.CreateRecurring(c.Request.Context(), request, claims.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Could not create recurring events"})
+		return
+	}
+	c.JSON(http.StatusCreated, ListResponse{Items: items})
+}
+
 func (h *Handler) Update(c *gin.Context) {
 	var request UpsertRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
@@ -137,6 +155,10 @@ func (h *Handler) CreateApplication(c *gin.Context) {
 	claims, _ := auth.GetClaims(c)
 	item, err := h.service.CreateApplication(c.Request.Context(), c.Param("id"), request, claims.UserID)
 	if err != nil {
+		if errors.Is(err, ErrAlreadyExists) {
+			c.JSON(http.StatusConflict, gin.H{"error": "already_exists", "message": "Application already exists"})
+			return
+		}
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Could not create application"})
 		return
 	}
@@ -158,6 +180,23 @@ func (h *Handler) UpdateApplication(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"item": item})
+}
+
+func (h *Handler) BulkUpdateApplications(c *gin.Context) {
+	var request BulkApplicationStatusRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+	if !h.requireCanManageEvent(c, c.Param("id")) {
+		return
+	}
+	items, err := h.service.BulkUpdateApplications(c.Request.Context(), c.Param("id"), request)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Could not update applications"})
+		return
+	}
+	c.JSON(http.StatusOK, ApplicationsResponse{Items: items})
 }
 
 func (h *Handler) DeleteApplication(c *gin.Context) {
@@ -208,6 +247,23 @@ func (h *Handler) MarkAttendance(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"item": item})
+}
+
+func (h *Handler) BulkMarkAttendance(c *gin.Context) {
+	var request BulkAttendanceRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+	if !h.requireCanManageEvent(c, c.Param("id")) {
+		return
+	}
+	items, err := h.service.BulkMarkAttendance(c.Request.Context(), c.Param("id"), request)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Could not mark attendance"})
+		return
+	}
+	c.JSON(http.StatusOK, AttendanceResponse{Items: items})
 }
 
 func (h *Handler) UpdateAttendance(c *gin.Context) {
@@ -309,6 +365,33 @@ func (h *Handler) Complete(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+}
+
+func (h *Handler) ListTemplates(c *gin.Context) {
+	items, err := h.service.ListTemplates(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not load templates"})
+		return
+	}
+	c.JSON(http.StatusOK, TemplatesResponse{Items: items})
+}
+
+func (h *Handler) CreateTemplate(c *gin.Context) {
+	var request EventTemplateRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+	claims, _ := auth.GetClaims(c)
+	if !h.requireCanManageContent(c, request.OrganizationID) {
+		return
+	}
+	item, err := h.service.CreateTemplate(c.Request.Context(), request, claims.UserID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Could not create template"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"item": item})
 }
 
 func (h *Handler) canManageEvent(c *gin.Context, eventID string) bool {

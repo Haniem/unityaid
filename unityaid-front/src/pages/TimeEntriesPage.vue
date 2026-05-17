@@ -6,7 +6,7 @@ import { fetchEvents } from '../entities/events/api'
 import type { EventItem } from '../entities/events/types'
 import { fetchTasks } from '../entities/tasks/api'
 import type { TaskItem } from '../entities/tasks/types'
-import { approveTimeEntry, createTimeEntry, fetchTimeEntries, rejectTimeEntry } from '../entities/timeentries/api'
+import { approveTimeEntry, bulkApproveTimeEntries, createTimeEntry, fetchTimeEntries, rejectTimeEntry } from '../entities/timeentries/api'
 import type { TimeEntry, TimeEntryStatus } from '../entities/timeentries/types'
 import { formatDateTime } from '../shared/date'
 import CustomSelect from '../shared/ui/CustomSelect.vue'
@@ -97,6 +97,17 @@ function targetTitle(item: TimeEntry) {
   return item.taskTitle || item.eventTitle || 'Без привязки'
 }
 
+async function approveAllPending() {
+  const ids = pendingItems.value.map((item) => item.id)
+  if (!ids.length) return
+  const response = await bulkApproveTimeEntries(ids)
+  for (const entry of response.items) {
+    const index = items.value.findIndex((item) => item.id === entry.id)
+    if (index >= 0) items.value[index] = entry
+  }
+  successMessage.value = `Подтверждено записей: ${response.items.length}`
+}
+
 onMounted(load)
 </script>
 
@@ -154,6 +165,10 @@ onMounted(load)
               <p class="eyebrow">Проверка</p>
               <h2>Ожидают подтверждения</h2>
             </div>
+            <button class="secondary-action" type="button" :disabled="pendingItems.length === 0" @click="approveAllPending">
+              <CheckCircle2 :size="17" />
+              <span>Подтвердить все</span>
+            </button>
           </div>
           <article v-for="item in pendingPageItems" :key="item.id" class="time-row">
             <div>

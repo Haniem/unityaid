@@ -4,6 +4,8 @@ import { useRoute } from 'vue-router'
 import { CalendarDays, CheckCircle2, Clock3, MapPin, QrCode, Star, Users } from 'lucide-vue-next'
 import { authState } from '../entities/auth/store'
 import {
+  bulkMarkEventAttendance,
+  bulkUpdateEventApplications,
   completeEvent,
   createEventApplication,
   createEventFeedback,
@@ -34,6 +36,10 @@ const feedback = ref<EventFeedback[]>([])
 const feedbackAverage = ref(0)
 const feedbackCount = ref(0)
 const attendanceHours = ref<Record<string, string>>({})
+const selectedApplicationIds = ref<string[]>([])
+const selectedAttendanceUserIds = ref<string[]>([])
+const bulkRejectionReason = ref('')
+const bulkAttendanceHours = ref('')
 const errorMessage = ref('')
 const successMessage = ref('')
 
@@ -64,9 +70,16 @@ const canManageEvent = computed(() => {
 })
 const myApplication = computed(() => applications.value.find((app) => app.userId === currentUserId.value))
 const approvedParticipants = computed(() => applications.value.filter((app) => app.status === 'approved'))
+const pendingApplications = computed(() => applications.value.filter((app) => app.status === 'pending'))
 const approvedParticipantOptions = computed(() => approvedParticipants.value.map((app) => ({ id: app.userId, name: app.userName })))
 const myFeedback = computed(() => feedback.value.find((entry) => entry.userId === currentUserId.value))
 const canLeaveFeedback = computed(() => item.value?.status === 'completed' && !canManageEvent.value)
+const coordinatorStats = computed(() => [
+  { label: 'Заявки', value: applications.value.length },
+  { label: 'Ожидают', value: pendingApplications.value.length },
+  { label: 'Участники', value: approvedParticipants.value.length },
+  { label: 'Отмечены', value: attendance.value.length }
+])
 
 const applicationStatusLabels: Record<EventApplication['status'], string> = {
   pending: 'На рассмотрении',
@@ -129,6 +142,22 @@ async function setApplicationStatus(app: EventApplication, status: EventApplicat
   if (index >= 0) applications.value[index] = response.item
 }
 
+async function bulkSetApplicationStatus(status: EventApplication['status']) {
+  if (!selectedApplicationIds.value.length) return
+  const response = await bulkUpdateEventApplications(eventId, {
+    applicationIds: selectedApplicationIds.value,
+    status,
+    rejectionReason: status === 'rejected' ? bulkRejectionReason.value : ''
+  })
+  for (const updated of response.items) {
+    const index = applications.value.findIndex((app) => app.id === updated.id)
+    if (index >= 0) applications.value[index] = updated
+  }
+  selectedApplicationIds.value = []
+  bulkRejectionReason.value = ''
+  successMessage.value = status === 'approved' ? 'Заявки подтверждены' : 'Заявки отклонены'
+}
+
 async function markAttendance() {
   if (!attendanceForm.userId) return
   await markEventAttendance(eventId, {
@@ -148,6 +177,19 @@ async function saveAttendance(row: EventAttendance) {
   const response = await updateEventAttendance(eventId, row.id, { hours })
   const index = attendance.value.findIndex((item) => item.id === row.id)
   if (index >= 0) attendance.value[index] = response.item
+}
+
+async function markSelectedAttendance() {
+  if (!selectedAttendanceUserIds.value.length) return
+  const response = await bulkMarkEventAttendance(eventId, {
+    userIds: selectedAttendanceUserIds.value,
+    hours: bulkAttendanceHours.value ? Number(bulkAttendanceHours.value) : undefined
+  })
+  attendance.value = response.items
+  attendanceHours.value = Object.fromEntries(response.items.map((row) => [row.id, String(row.hours)]))
+  selectedAttendanceUserIds.value = []
+  bulkAttendanceHours.value = ''
+  successMessage.value = 'Посещаемость отмечена'
 }
 
 async function addShift() {
@@ -212,6 +254,34 @@ onMounted(load)
         </button>
       </div>
 
+      <section v-if="canManageEvent" class="detail-panel coordinator-console">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Рабочий экран координатора</p>
+            <h2>Оперативное управление</h2>
+          </div>
+        </div>
+        <div class="detail-metrics">
+          <div v-for="stat in coordinatorStats" :key="stat.label">
+            <CheckCircle2 :size="18" />
+            <span>{{ stat.label }}: {{ stat.value }}</span>
+          </div>
+        </div>
+        <div class="bulk-toolbar">
+          <button class="secondary-action" type="button" :disabled="selectedApplicationIds.length === 0" @click="bulkSetApplicationStatus('approved')">
+            Подтвердить выбранные
+          </button>
+          <input v-model="bulkRejectionReason" placeholder="Причина отклонения" />
+          <button class="secondary-action danger-action" type="button" :disabled="selectedApplicationIds.length === 0" @click="bulkSetApplicationStatus('rejected')">
+            Отклонить выбранные
+          </button>
+          <input v-model="bulkAttendanceHours" type="number" min="0" step="0.25" placeholder="часы" />
+          <button class="primary-action" type="button" :disabled="selectedAttendanceUserIds.length === 0" @click="markSelectedAttendance">
+            Отметить посещаемость
+          </button>
+        </div>
+      </section>
+
       <div class="management-grid">
         <section class="detail-panel">
           <p class="eyebrow">Участие</p>
@@ -233,9 +303,11 @@ onMounted(load)
         <section v-if="canManageEvent" class="detail-panel">
           <p class="eyebrow">Заявки координатора</p>
           <article v-for="app in applicationsPageItems" :key="app.id" class="member-row application-row">
+            <input v-model="selectedApplicationIds" type="checkbox" :value="app.id" aria-label="Выбрать заявку" />
             <div>
               <strong>{{ app.userName }}</strong>
               <small>{{ app.email }} · {{ app.message || 'без комментария' }}</small>
+              <small v-if="app.rejectionReason">Причина: {{ app.rejectionReason }}</small>
             </div>
             <span class="status-pill">{{ applicationStatusLabels[app.status] }}</span>
             <CustomSelect :model-value="app.status" :options="applicationStatusOptions" @update:model-value="setApplicationStatus(app, $event as EventApplication['status'])" />
@@ -247,6 +319,7 @@ onMounted(load)
         <section v-if="canManageEvent" class="detail-panel">
           <p class="eyebrow">Участники</p>
           <article v-for="app in approvedParticipants" :key="app.id" class="member-row application-row">
+            <input v-model="selectedAttendanceUserIds" type="checkbox" :value="app.userId" aria-label="Выбрать участника" />
             <div>
               <strong>{{ app.userName }}</strong>
               <small>{{ app.email }}</small>

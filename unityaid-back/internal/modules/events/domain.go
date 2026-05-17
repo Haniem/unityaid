@@ -37,15 +37,16 @@ type UpsertRequest struct {
 }
 
 type Application struct {
-	ID        string    `json:"id"`
-	EventID   string    `json:"eventId"`
-	UserID    string    `json:"userId"`
-	UserName  string    `json:"userName"`
-	Email     string    `json:"email"`
-	Status    string    `json:"status"`
-	Message   string    `json:"message"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID              string    `json:"id"`
+	EventID         string    `json:"eventId"`
+	UserID          string    `json:"userId"`
+	UserName        string    `json:"userName"`
+	Email           string    `json:"email"`
+	Status          string    `json:"status"`
+	Message         string    `json:"message"`
+	RejectionReason string    `json:"rejectionReason"`
+	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
 }
 
 type Attendance struct {
@@ -85,13 +86,25 @@ type ApplicationRequest struct {
 }
 
 type ApplicationStatusRequest struct {
-	Status string `json:"status" binding:"required"`
+	Status          string `json:"status" binding:"required"`
+	RejectionReason string `json:"rejectionReason"`
+}
+
+type BulkApplicationStatusRequest struct {
+	ApplicationIDs  []string `json:"applicationIds" binding:"required"`
+	Status          string   `json:"status" binding:"required"`
+	RejectionReason string   `json:"rejectionReason"`
 }
 
 type AttendanceRequest struct {
 	UserID      string  `json:"userId" binding:"required"`
 	CheckinCode string  `json:"checkinCode"`
 	Hours       float64 `json:"hours"`
+}
+
+type BulkAttendanceRequest struct {
+	UserIDs []string `json:"userIds" binding:"required"`
+	Hours   float64  `json:"hours"`
 }
 
 type AttendanceUpdateRequest struct {
@@ -111,6 +124,38 @@ type FeedbackRequest struct {
 	Comment string `json:"comment"`
 }
 
+type EventTemplate struct {
+	ID                     string    `json:"id"`
+	OrganizationID         string    `json:"organizationId"`
+	OrganizationName       string    `json:"organizationName"`
+	Name                   string    `json:"name"`
+	Title                  string    `json:"title"`
+	Description            string    `json:"description"`
+	Format                 string    `json:"format"`
+	Location               *string   `json:"location"`
+	MaxParticipants        *int      `json:"maxParticipants"`
+	DefaultDurationMinutes int       `json:"defaultDurationMinutes"`
+	CreatedAt              time.Time `json:"createdAt"`
+	UpdatedAt              time.Time `json:"updatedAt"`
+}
+
+type EventTemplateRequest struct {
+	OrganizationID         string  `json:"organizationId" binding:"required"`
+	Name                   string  `json:"name" binding:"required"`
+	Title                  string  `json:"title" binding:"required"`
+	Description            string  `json:"description"`
+	Format                 string  `json:"format"`
+	Location               *string `json:"location"`
+	MaxParticipants        *int    `json:"maxParticipants"`
+	DefaultDurationMinutes int     `json:"defaultDurationMinutes"`
+}
+
+type RecurringEventRequest struct {
+	EventPayload UpsertRequest `json:"event" binding:"required"`
+	Frequency    string        `json:"frequency"`
+	Count        int           `json:"count"`
+}
+
 type ApplicationsResponse struct {
 	Items []Application `json:"items"`
 }
@@ -124,4 +169,8 @@ type FeedbackResponse struct {
 	Items         []Feedback `json:"items"`
 	AverageRating float64    `json:"averageRating"`
 	FeedbackCount int        `json:"feedbackCount"`
+}
+
+type TemplatesResponse struct {
+	Items []EventTemplate `json:"items"`
 }

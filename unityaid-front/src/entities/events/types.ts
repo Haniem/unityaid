@@ -35,6 +35,7 @@ export type EventApplication = {
   email: string
   status: 'pending' | 'approved' | 'waitlisted' | 'rejected' | 'cancelled'
   message: string
+  rejectionReason: string
   createdAt: string
   updatedAt: string
 }
@@ -72,4 +73,19 @@ export type EventFeedbackResponse = {
   items: EventFeedback[]
   averageRating: number
   feedbackCount: number
+}
+
+export type EventTemplate = {
+  id: string
+  organizationId: string
+  organizationName: string
+  name: string
+  title: string
+  description: string
+  format: EventItem['format']
+  location?: string | null
+  maxParticipants?: number | null
+  defaultDurationMinutes: number
+  createdAt: string
+  updatedAt: string
 }

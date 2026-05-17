@@ -37,6 +37,32 @@ func (s *Service) Create(ctx context.Context, request UpsertRequest, userID stri
 	return s.repository.Create(ctx, request, startsAt, endsAt, userID)
 }
 
+func (s *Service) CreateRecurring(ctx context.Context, request RecurringEventRequest, userID string) ([]Event, error) {
+	startsAt, endsAt, err := parseRange(request.EventPayload)
+	if err != nil {
+		return nil, err
+	}
+	count := request.Count
+	if count < 1 {
+		count = 1
+	}
+	if count > 24 {
+		count = 24
+	}
+	items := make([]Event, 0, count)
+	for index := 0; index < count; index++ {
+		payload := request.EventPayload
+		nextStart := addRecurrence(startsAt, request.Frequency, index)
+		nextEnd := addRecurrence(endsAt, request.Frequency, index)
+		item, err := s.repository.Create(ctx, payload, nextStart, nextEnd, userID)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, nil
+}
+
 func (s *Service) Update(ctx context.Context, id string, request UpsertRequest) (Event, error) {
 	startsAt, endsAt, err := parseRange(request)
 	if err != nil {
@@ -62,7 +88,7 @@ func (s *Service) CreateApplication(ctx context.Context, eventID string, request
 }
 
 func (s *Service) UpdateApplicationStatus(ctx context.Context, eventID string, applicationID string, request ApplicationStatusRequest) (Application, error) {
-	application, err := s.repository.UpdateApplicationStatus(ctx, eventID, applicationID, request.Status)
+	application, err := s.repository.UpdateApplicationStatus(ctx, eventID, applicationID, request.Status, request.RejectionReason)
 	if err != nil {
 		return Application{}, err
 	}
@@ -92,6 +118,32 @@ func (s *Service) UpdateApplicationStatus(ctx context.Context, eventID string, a
 	return application, nil
 }
 
+func (s *Service) BulkUpdateApplications(ctx context.Context, eventID string, request BulkApplicationStatusRequest) ([]Application, error) {
+	items, err := s.repository.BulkUpdateApplications(ctx, eventID, request)
+	if err != nil {
+		return nil, err
+	}
+	for _, application := range items {
+		if application.Status == "approved" || application.Status == "rejected" {
+			event, findErr := s.repository.FindByID(ctx, eventID)
+			body := application.Status
+			if findErr == nil {
+				body = event.Title
+			}
+			s.notify(ctx, notifications.CreateRequest{
+				UserID:     application.UserID,
+				Type:       "application_" + application.Status,
+				Title:      "Заявка обновлена",
+				Body:       body,
+				Link:       "/calendar/" + eventID,
+				EntityType: "event_application",
+				EntityID:   application.ID,
+			})
+		}
+	}
+	return items, nil
+}
+
 func (s *Service) DeleteApplication(ctx context.Context, eventID string, applicationID string) error {
 	return s.repository.DeleteApplication(ctx, eventID, applicationID)
 }
@@ -106,6 +158,10 @@ func (s *Service) ListAttendance(ctx context.Context, eventID string) ([]Attenda
 
 func (s *Service) MarkAttendance(ctx context.Context, eventID string, request AttendanceRequest) (Attendance, error) {
 	return s.repository.MarkAttendance(ctx, eventID, request)
+}
+
+func (s *Service) BulkMarkAttendance(ctx context.Context, eventID string, request BulkAttendanceRequest) ([]Attendance, error) {
+	return s.repository.BulkMarkAttendance(ctx, eventID, request)
 }
 
 func (s *Service) UpdateAttendance(ctx context.Context, eventID string, attendanceID string, request AttendanceUpdateRequest) (Attendance, error) {
@@ -155,6 +211,17 @@ func (s *Service) CompleteEvent(ctx context.Context, eventID string) error {
 	return s.repository.CompleteEvent(ctx, eventID)
 }
 
+func (s *Service) ListTemplates(ctx context.Context) ([]EventTemplate, error) {
+	return s.repository.ListTemplates(ctx)
+}
+
+func (s *Service) CreateTemplate(ctx context.Context, request EventTemplateRequest, userID string) (EventTemplate, error) {
+	if request.DefaultDurationMinutes <= 0 {
+		request.DefaultDurationMinutes = 120
+	}
+	return s.repository.CreateTemplate(ctx, request, userID)
+}
+
 func (s *Service) notify(ctx context.Context, request notifications.CreateRequest) {
 	if s.notifier == nil {
 		return
@@ -172,4 +239,15 @@ func parseRange(request UpsertRequest) (time.Time, time.Time, error) {
 		return time.Time{}, time.Time{}, err
 	}
 	return startsAt, endsAt, nil
+}
+
+func addRecurrence(value time.Time, frequency string, index int) time.Time {
+	switch frequency {
+	case "monthly":
+		return value.AddDate(0, index, 0)
+	case "daily":
+		return value.AddDate(0, 0, index)
+	default:
+		return value.AddDate(0, 0, index*7)
+	}
 }

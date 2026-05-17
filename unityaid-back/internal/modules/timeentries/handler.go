@@ -103,6 +103,28 @@ func (h *Handler) Approve(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"item": item})
 }
 
+func (h *Handler) BulkApprove(c *gin.Context) {
+	var request BulkReviewRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+	claims, _ := auth.GetClaims(c)
+	items := make([]TimeEntry, 0, len(request.IDs))
+	for _, id := range request.IDs {
+		if !h.requireCanReview(c, id) {
+			return
+		}
+		item, err := h.service.Approve(c.Request.Context(), id, claims.UserID)
+		if err != nil {
+			h.handleEntryError(c, err)
+			return
+		}
+		items = append(items, item)
+	}
+	c.JSON(http.StatusOK, ListResponse{Items: items})
+}
+
 func (h *Handler) Reject(c *gin.Context) {
 	if !h.requireCanReview(c, c.Param("id")) {
 		return
