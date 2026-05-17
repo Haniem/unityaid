@@ -65,6 +65,55 @@ const eventSettings = ref({
   defaultCapacity: 25,
   cancellationReason: 'Нет свободных мест'
 })
+const taskSettings = ref({
+  defaultStatus: 'created',
+  defaultPriority: 'medium',
+  reviewRequired: true,
+  overdueHours: 24,
+  overdueNotifyRole: 'coordinator'
+})
+const notificationSettings = ref({
+  inAppEnabled: true,
+  emailEnabled: false,
+  reminderHours: 24,
+  digestFrequency: 'weekly',
+  escalationEnabled: true
+})
+const certificateSettings = ref({
+  templateName: 'Базовый сертификат',
+  numberingPrefix: 'UA',
+  publicVerification: true,
+  signatureRole: 'Руководитель программы',
+  consentRequired: true
+})
+const contentSettings = ref({
+  defaultNewsStatus: 'draft',
+  defaultArticleStatus: 'draft',
+  moderationRequired: true,
+  archiveAfterDays: 365,
+  allowCoordinatorsPublish: true
+})
+const gamificationSettings = ref({
+  enabled: true,
+  pointsPerHour: 10,
+  pointsPerTask: 25,
+  leaderboardEnabled: true,
+  recalculationMode: 'manual'
+})
+const analyticsSettings = ref({
+  activeVolunteerDays: 30,
+  targetHours: 1000,
+  targetEvents: 20,
+  reportFrequency: 'monthly',
+  exportAuditEnabled: true
+})
+const fileSettings = ref({
+  maxImageMb: 5,
+  maxAttachmentMb: 20,
+  allowedTypes: 'jpg, png, pdf, docx, xlsx',
+  cleanupEnabled: true,
+  retentionDays: 365
+})
 
 const isSuperAdmin = computed(() => authState.user?.primaryRole === 'super_admin')
 const isClientAdmin = computed(() => ['super_admin', 'org_admin'].includes(authState.user?.primaryRole ?? ''))
@@ -538,6 +587,367 @@ onMounted(load)
             <label class="toggle-field settings-form-wide">
               <input v-model="eventSettings.waitlistEnabled" type="checkbox" />
               <span>Включить лист ожидания при заполненном лимите</span>
+            </label>
+            <div class="form-actions settings-form-wide">
+              <button class="primary-action" type="submit">
+                <Save :size="17" />
+                <span>Сохранить настройки</span>
+              </button>
+            </div>
+          </form>
+        </section>
+        <p v-if="moduleSaveMessage" class="form-success">{{ moduleSaveMessage }}</p>
+      </div>
+    </template>
+
+    <template v-else-if="selectedSection.id === 'tasks'">
+      <div class="settings-module-shell">
+        <section class="detail-panel settings-module-panel">
+          <span class="settings-card-icon">
+            <ListTodo :size="26" />
+          </span>
+          <div>
+            <p class="eyebrow">Раздел настроек</p>
+            <h2>Задачи</h2>
+            <p>Статусы, приоритеты, подтверждение выполнения, просрочки и уведомления исполнителей.</p>
+          </div>
+        </section>
+
+        <section class="detail-panel">
+          <form class="settings-form settings-form-grid" @submit.prevent="saveModuleSettings('Задачи')">
+            <label>
+              <span>Статус новой задачи</span>
+              <select v-model="taskSettings.defaultStatus">
+                <option value="created">Создана</option>
+                <option value="assigned">Назначена</option>
+                <option value="in_progress">В работе</option>
+              </select>
+            </label>
+            <label>
+              <span>Приоритет по умолчанию</span>
+              <select v-model="taskSettings.defaultPriority">
+                <option value="low">Низкий</option>
+                <option value="medium">Средний</option>
+                <option value="high">Высокий</option>
+              </select>
+            </label>
+            <label>
+              <span>Просрочка через, часов</span>
+              <input v-model.number="taskSettings.overdueHours" type="number" min="1" />
+            </label>
+            <label>
+              <span>Кого уведомлять о просрочке</span>
+              <select v-model="taskSettings.overdueNotifyRole">
+                <option value="coordinator">Координатора</option>
+                <option value="org_admin">Администратора организации</option>
+                <option value="assignee">Исполнителя</option>
+              </select>
+            </label>
+            <label class="toggle-field settings-form-wide">
+              <input v-model="taskSettings.reviewRequired" type="checkbox" />
+              <span>Требовать подтверждение выполнения координатором</span>
+            </label>
+            <div class="form-actions settings-form-wide">
+              <button class="primary-action" type="submit">
+                <Save :size="17" />
+                <span>Сохранить настройки</span>
+              </button>
+            </div>
+          </form>
+        </section>
+        <p v-if="moduleSaveMessage" class="form-success">{{ moduleSaveMessage }}</p>
+      </div>
+    </template>
+
+    <template v-else-if="selectedSection.id === 'notifications'">
+      <div class="settings-module-shell">
+        <section class="detail-panel settings-module-panel">
+          <span class="settings-card-icon">
+            <Bell :size="26" />
+          </span>
+          <div>
+            <p class="eyebrow">Раздел настроек</p>
+            <h2>Уведомления</h2>
+            <p>Каналы доставки, напоминания, digest-рассылки и эскалации важных событий.</p>
+          </div>
+        </section>
+
+        <section class="detail-panel">
+          <form class="settings-form settings-form-grid" @submit.prevent="saveModuleSettings('Уведомления')">
+            <label>
+              <span>Напоминать за, часов</span>
+              <input v-model.number="notificationSettings.reminderHours" type="number" min="1" />
+            </label>
+            <label>
+              <span>Сводка уведомлений</span>
+              <select v-model="notificationSettings.digestFrequency">
+                <option value="never">Не отправлять</option>
+                <option value="daily">Ежедневно</option>
+                <option value="weekly">Еженедельно</option>
+              </select>
+            </label>
+            <label class="toggle-field">
+              <input v-model="notificationSettings.inAppEnabled" type="checkbox" />
+              <span>Включить in-app уведомления</span>
+            </label>
+            <label class="toggle-field">
+              <input v-model="notificationSettings.emailEnabled" type="checkbox" />
+              <span>Включить email-уведомления</span>
+            </label>
+            <label class="toggle-field settings-form-wide">
+              <input v-model="notificationSettings.escalationEnabled" type="checkbox" />
+              <span>Эскалировать просрочки задач и неподтвержденные часы</span>
+            </label>
+            <div class="form-actions settings-form-wide">
+              <button class="primary-action" type="submit">
+                <Save :size="17" />
+                <span>Сохранить настройки</span>
+              </button>
+            </div>
+          </form>
+        </section>
+        <p v-if="moduleSaveMessage" class="form-success">{{ moduleSaveMessage }}</p>
+      </div>
+    </template>
+
+    <template v-else-if="selectedSection.id === 'certificates'">
+      <div class="settings-module-shell">
+        <section class="detail-panel settings-module-panel">
+          <span class="settings-card-icon">
+            <FileCheck2 :size="26" />
+          </span>
+          <div>
+            <p class="eyebrow">Раздел настроек</p>
+            <h2>Сертификаты и документы</h2>
+            <p>Шаблоны PDF, подписи, нумерация, согласия и публичная проверка документов.</p>
+          </div>
+        </section>
+
+        <section class="detail-panel">
+          <form class="settings-form settings-form-grid" @submit.prevent="saveModuleSettings('Сертификаты и документы')">
+            <label>
+              <span>Шаблон по умолчанию</span>
+              <input v-model="certificateSettings.templateName" type="text" />
+            </label>
+            <label>
+              <span>Префикс нумерации</span>
+              <input v-model="certificateSettings.numberingPrefix" type="text" />
+            </label>
+            <label class="settings-form-wide">
+              <span>Подписант</span>
+              <input v-model="certificateSettings.signatureRole" type="text" />
+            </label>
+            <label class="toggle-field">
+              <input v-model="certificateSettings.publicVerification" type="checkbox" />
+              <span>Включить публичную проверку по коду</span>
+            </label>
+            <label class="toggle-field">
+              <input v-model="certificateSettings.consentRequired" type="checkbox" />
+              <span>Требовать согласие перед выдачей документа</span>
+            </label>
+            <div class="form-actions settings-form-wide">
+              <button class="primary-action" type="submit">
+                <Save :size="17" />
+                <span>Сохранить настройки</span>
+              </button>
+            </div>
+          </form>
+        </section>
+        <p v-if="moduleSaveMessage" class="form-success">{{ moduleSaveMessage }}</p>
+      </div>
+    </template>
+
+    <template v-else-if="selectedSection.id === 'content'">
+      <div class="settings-module-shell">
+        <section class="detail-panel settings-module-panel">
+          <span class="settings-card-icon">
+            <BookOpen :size="26" />
+          </span>
+          <div>
+            <p class="eyebrow">Раздел настроек</p>
+            <h2>База знаний и новости</h2>
+            <p>Публикация материалов, модерация, статусы по умолчанию, категории и архивирование.</p>
+          </div>
+        </section>
+
+        <section class="detail-panel">
+          <form class="settings-form settings-form-grid" @submit.prevent="saveModuleSettings('База знаний и новости')">
+            <label>
+              <span>Статус новой новости</span>
+              <select v-model="contentSettings.defaultNewsStatus">
+                <option value="draft">Черновик</option>
+                <option value="published">Опубликована</option>
+                <option value="scheduled">Запланирована</option>
+              </select>
+            </label>
+            <label>
+              <span>Статус новой статьи</span>
+              <select v-model="contentSettings.defaultArticleStatus">
+                <option value="draft">Черновик</option>
+                <option value="published">Опубликована</option>
+                <option value="archived">Архив</option>
+              </select>
+            </label>
+            <label>
+              <span>Архивировать через, дней</span>
+              <input v-model.number="contentSettings.archiveAfterDays" type="number" min="1" />
+            </label>
+            <label class="toggle-field">
+              <input v-model="contentSettings.moderationRequired" type="checkbox" />
+              <span>Требовать модерацию материалов</span>
+            </label>
+            <label class="toggle-field settings-form-wide">
+              <input v-model="contentSettings.allowCoordinatorsPublish" type="checkbox" />
+              <span>Разрешить координаторам публикацию без администратора</span>
+            </label>
+            <div class="form-actions settings-form-wide">
+              <button class="primary-action" type="submit">
+                <Save :size="17" />
+                <span>Сохранить настройки</span>
+              </button>
+            </div>
+          </form>
+        </section>
+        <p v-if="moduleSaveMessage" class="form-success">{{ moduleSaveMessage }}</p>
+      </div>
+    </template>
+
+    <template v-else-if="selectedSection.id === 'gamification'">
+      <div class="settings-module-shell">
+        <section class="detail-panel settings-module-panel">
+          <span class="settings-card-icon">
+            <Award :size="26" />
+          </span>
+          <div>
+            <p class="eyebrow">Раздел настроек</p>
+            <h2>Геймификация</h2>
+            <p>Правила начисления баллов, достижения, уровни и лидерборд волонтеров.</p>
+          </div>
+        </section>
+
+        <section class="detail-panel">
+          <form class="settings-form settings-form-grid" @submit.prevent="saveModuleSettings('Геймификация')">
+            <label>
+              <span>Баллов за час</span>
+              <input v-model.number="gamificationSettings.pointsPerHour" type="number" min="0" />
+            </label>
+            <label>
+              <span>Баллов за задачу</span>
+              <input v-model.number="gamificationSettings.pointsPerTask" type="number" min="0" />
+            </label>
+            <label>
+              <span>Режим пересчета</span>
+              <select v-model="gamificationSettings.recalculationMode">
+                <option value="manual">Ручной</option>
+                <option value="scheduled">По расписанию</option>
+                <option value="automatic">Автоматический</option>
+              </select>
+            </label>
+            <label class="toggle-field">
+              <input v-model="gamificationSettings.enabled" type="checkbox" />
+              <span>Включить геймификацию</span>
+            </label>
+            <label class="toggle-field settings-form-wide">
+              <input v-model="gamificationSettings.leaderboardEnabled" type="checkbox" />
+              <span>Показывать лидерборд волонтеров</span>
+            </label>
+            <div class="form-actions settings-form-wide">
+              <button class="primary-action" type="submit">
+                <Save :size="17" />
+                <span>Сохранить настройки</span>
+              </button>
+            </div>
+          </form>
+        </section>
+        <p v-if="moduleSaveMessage" class="form-success">{{ moduleSaveMessage }}</p>
+      </div>
+    </template>
+
+    <template v-else-if="selectedSection.id === 'analytics'">
+      <div class="settings-module-shell">
+        <section class="detail-panel settings-module-panel">
+          <span class="settings-card-icon">
+            <BarChart3 :size="26" />
+          </span>
+          <div>
+            <p class="eyebrow">Раздел настроек</p>
+            <h2>Аналитика и отчеты</h2>
+            <p>KPI клиента, период активности волонтера, плановые отчеты и аудит выгрузок.</p>
+          </div>
+        </section>
+
+        <section class="detail-panel">
+          <form class="settings-form settings-form-grid" @submit.prevent="saveModuleSettings('Аналитика и отчеты')">
+            <label>
+              <span>Активный волонтер за, дней</span>
+              <input v-model.number="analyticsSettings.activeVolunteerDays" type="number" min="1" />
+            </label>
+            <label>
+              <span>Целевые часы за период</span>
+              <input v-model.number="analyticsSettings.targetHours" type="number" min="0" />
+            </label>
+            <label>
+              <span>Целевые мероприятия за период</span>
+              <input v-model.number="analyticsSettings.targetEvents" type="number" min="0" />
+            </label>
+            <label>
+              <span>Периодичность отчета</span>
+              <select v-model="analyticsSettings.reportFrequency">
+                <option value="weekly">Еженедельно</option>
+                <option value="monthly">Ежемесячно</option>
+                <option value="quarterly">Ежеквартально</option>
+              </select>
+            </label>
+            <label class="toggle-field settings-form-wide">
+              <input v-model="analyticsSettings.exportAuditEnabled" type="checkbox" />
+              <span>Писать экспорт отчетов в аудит</span>
+            </label>
+            <div class="form-actions settings-form-wide">
+              <button class="primary-action" type="submit">
+                <Save :size="17" />
+                <span>Сохранить настройки</span>
+              </button>
+            </div>
+          </form>
+        </section>
+        <p v-if="moduleSaveMessage" class="form-success">{{ moduleSaveMessage }}</p>
+      </div>
+    </template>
+
+    <template v-else-if="selectedSection.id === 'files'">
+      <div class="settings-module-shell">
+        <section class="detail-panel settings-module-panel">
+          <span class="settings-card-icon">
+            <FileArchive :size="26" />
+          </span>
+          <div>
+            <p class="eyebrow">Раздел настроек</p>
+            <h2>Файлы</h2>
+            <p>Лимиты загрузки, разрешенные типы файлов, очистка и сроки хранения вложений.</p>
+          </div>
+        </section>
+
+        <section class="detail-panel">
+          <form class="settings-form settings-form-grid" @submit.prevent="saveModuleSettings('Файлы')">
+            <label>
+              <span>Максимум изображения, МБ</span>
+              <input v-model.number="fileSettings.maxImageMb" type="number" min="1" />
+            </label>
+            <label>
+              <span>Максимум вложения, МБ</span>
+              <input v-model.number="fileSettings.maxAttachmentMb" type="number" min="1" />
+            </label>
+            <label class="settings-form-wide">
+              <span>Разрешенные типы</span>
+              <input v-model="fileSettings.allowedTypes" type="text" />
+            </label>
+            <label>
+              <span>Хранить файлы, дней</span>
+              <input v-model.number="fileSettings.retentionDays" type="number" min="1" />
+            </label>
+            <label class="toggle-field">
+              <input v-model="fileSettings.cleanupEnabled" type="checkbox" />
+              <span>Включить очистку неиспользуемых файлов</span>
             </label>
             <div class="form-actions settings-form-wide">
               <button class="primary-action" type="submit">
