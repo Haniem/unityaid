@@ -2926,6 +2926,105 @@ a {
   cursor: pointer;
 }
 
+.module-tool-block {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #e4e8f0;
+}
+
+.icon-button-wide {
+  width: 46px;
+  min-width: 46px;
+  justify-content: center;
+  padding: 0;
+}
+
+.compact-list .invite-card {
+  align-items: flex-start;
+}
+
+.copy-line {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.muted-text {
+  margin: 0;
+  color: #7a839a;
+  font-size: 0.9rem;
+}
+
+.file-drop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  border: 1px dashed #bac4d5;
+  border-radius: 8px;
+  color: #4f6075;
+  background: #f8fafc;
+  cursor: pointer;
+}
+
+.file-drop input {
+  display: none;
+}
+
+.form-success {
+  margin: 0;
+  color: #2f6f4e;
+  font-weight: 700;
+}
+
+.import-preview {
+  display: grid;
+  gap: 12px;
+}
+
+.import-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.import-summary span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #405047;
+  background: #eef5f0;
+  font-size: 0.82rem;
+}
+
+.import-table {
+  display: grid;
+  gap: 8px;
+}
+
+.import-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 4px 8px;
+  padding: 10px;
+  border: 1px solid #e4e8f0;
+  border-radius: 8px;
+}
+
+.import-row small {
+  grid-column: 2;
+  color: #7a839a;
+}
+
+.import-row.has-errors {
+  border-color: #f1b6bd;
+  background: #fff7f8;
+}
+
 .checkbox-group {
   display: flex;
   flex-wrap: wrap;

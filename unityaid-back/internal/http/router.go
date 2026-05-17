@@ -18,6 +18,7 @@ import (
 	"unityaid-back/internal/modules/files"
 	"unityaid-back/internal/modules/forms"
 	"unityaid-back/internal/modules/gamification"
+	"unityaid-back/internal/modules/invitations"
 	"unityaid-back/internal/modules/knowledge"
 	"unityaid-back/internal/modules/news"
 	"unityaid-back/internal/modules/notifications"
@@ -26,6 +27,7 @@ import (
 	"unityaid-back/internal/modules/tenantsettings"
 	"unityaid-back/internal/modules/timeentries"
 	"unityaid-back/internal/modules/users"
+	"unityaid-back/internal/modules/volunteerimports"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -157,6 +159,19 @@ func NewRouter(deps RouterDeps) http.Handler {
 	volunteersGroup.GET("", usersHandler.ListVolunteers)
 	volunteersGroup.GET("/:id", usersHandler.GetVolunteer)
 	volunteersGroup.PATCH("/:id", usersHandler.UpdateVolunteer)
+
+	invitationsRepository := invitations.NewRepository(deps.DB)
+	invitationsService := invitations.NewService(invitationsRepository)
+	invitationsHandler := invitations.NewHandler(invitationsService)
+	invitationsGroup := api.Group("/invitations", authMiddleware, auditMiddleware)
+	invitationsGroup.GET("", canManageOrganizations, invitationsHandler.List)
+	invitationsGroup.POST("", canManageOrganizations, invitationsHandler.Create)
+	invitationsGroup.POST("/:token/accept", invitationsHandler.Accept)
+
+	volunteerImportsHandler := volunteerimports.NewHandler(deps.DB)
+	volunteerImportsGroup := api.Group("/volunteer-imports", authMiddleware, auditMiddleware, canManageContent)
+	volunteerImportsGroup.POST("/preview", volunteerImportsHandler.Preview)
+	volunteerImportsGroup.POST("/commit", volunteerImportsHandler.Commit)
 
 	skillsGroup := api.Group("/skills", authMiddleware, auditMiddleware)
 	skillsGroup.GET("", usersHandler.ListSkills)

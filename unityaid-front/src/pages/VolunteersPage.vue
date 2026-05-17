@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Award, Clock3, HelpCircle, Pencil, Plus, Search, Trash2, UsersRound } from 'lucide-vue-next'
+import { Award, Clock3, FileSpreadsheet, HelpCircle, Link2, MailPlus, Pencil, Plus, Search, Trash2, Upload, UsersRound } from 'lucide-vue-next'
 import { createSkill, deleteSkill, fetchSkills, fetchVolunteers, updateVolunteer } from '../entities/users/api'
 import type { Skill, VolunteerProfile } from '../entities/users/types'
 import { fetchEditForm } from '../entities/forms/api'
 import type { BackendForm, FormModel } from '../entities/forms/types'
+import { createInvitation, fetchInvitations } from '../entities/invitations/api'
+import type { Invitation } from '../entities/invitations/types'
+import { commitVolunteerImport, previewVolunteerImport } from '../entities/volunteerImports/api'
+import type { ImportPreview } from '../entities/volunteerImports/types'
 import DynamicForm from '../shared/ui/DynamicForm.vue'
 import CustomSelect from '../shared/ui/CustomSelect.vue'
 import PaginationBar from '../shared/ui/PaginationBar.vue'
@@ -24,6 +28,15 @@ const skillName = ref('')
 const skillError = ref('')
 const formSchema = ref<BackendForm | null>(null)
 const formModel = ref<FormModel>({})
+const invitations = ref<Invitation[]>([])
+const inviteEmail = ref('')
+const inviteRole = ref('volunteer')
+const inviteMessage = ref('')
+const inviteError = ref('')
+const importPreview = ref<ImportPreview | null>(null)
+const importError = ref('')
+const importMessage = ref('')
+const isImporting = ref(false)
 const { page, perPage, pageItems } = useClientPagination(volunteers, 12)
 
 const totalHours = computed(() => volunteers.value.reduce((sum, item) => sum + item.totalHours, 0))
@@ -51,12 +64,14 @@ function closeModal() {
 async function load() {
   loadError.value = ''
   try {
-    const [volunteersResponse, skillsResponse] = await Promise.all([
+    const [volunteersResponse, skillsResponse, invitationsResponse] = await Promise.all([
       fetchVolunteers({ search: search.value, skillId: skillId.value }),
-      fetchSkills()
+      fetchSkills(),
+      fetchInvitations().catch(() => ({ items: [] }))
     ])
     volunteers.value = volunteersResponse.items
     skills.value = skillsResponse.items
+    invitations.value = invitationsResponse.items
   } catch (error) {
     loadError.value = error instanceof Error ? error.message : 'Не удалось загрузить волонтеров'
   }
@@ -108,6 +123,54 @@ async function removeSkill(item: Skill) {
   if (skillId.value === item.id) skillId.value = ''
 }
 
+async function inviteUser() {
+  const email = inviteEmail.value.trim()
+  if (!email) return
+  inviteError.value = ''
+  inviteMessage.value = ''
+  try {
+    const response = await createInvitation({ email, role: inviteRole.value })
+    invitations.value = [response.item, ...invitations.value]
+    inviteEmail.value = ''
+    inviteMessage.value = 'Приглашение создано'
+  } catch (error) {
+    inviteError.value = error instanceof Error ? error.message : 'Не удалось создать приглашение'
+  }
+}
+
+async function handleImportFile(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  importError.value = ''
+  importMessage.value = ''
+  try {
+    importPreview.value = await previewVolunteerImport(file)
+  } catch (error) {
+    importPreview.value = null
+    importError.value = error instanceof Error ? error.message : 'Не удалось разобрать файл'
+  } finally {
+    input.value = ''
+  }
+}
+
+async function commitImport() {
+  if (!importPreview.value || importPreview.value.validCount === 0) return
+  importError.value = ''
+  importMessage.value = ''
+  isImporting.value = true
+  try {
+    const response = await commitVolunteerImport(importPreview.value.items)
+    importPreview.value = null
+    importMessage.value = `Импортировано профилей: ${response.imported}`
+    await load()
+  } catch (error) {
+    importError.value = error instanceof Error ? error.message : 'Не удалось импортировать волонтеров'
+  } finally {
+    isImporting.value = false
+  }
+}
+
 function statusLabel(status: VolunteerProfile['status']) {
   const labels: Record<VolunteerProfile['status'], string> = {
     new: 'Новый',
@@ -116,6 +179,16 @@ function statusLabel(status: VolunteerProfile['status']) {
     archived: 'Архив'
   }
   return labels[status] || 'Активный'
+}
+
+function invitationStatusLabel(status: Invitation['status']) {
+  const labels: Record<Invitation['status'], string> = {
+    pending: 'Ожидает',
+    accepted: 'Принято',
+    revoked: 'Отозвано',
+    expired: 'Истекло'
+  }
+  return labels[status] || status
 }
 
 let searchTimer: number | undefined
@@ -225,6 +298,71 @@ onMounted(load)
               <Trash2 :size="14" />
             </button>
           </span>
+        </div>
+        <div class="module-tool-block">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Доступ</p>
+              <h2>Приглашения</h2>
+            </div>
+            <MailPlus :size="20" />
+          </div>
+          <form class="invite-row" @submit.prevent="inviteUser">
+            <input v-model="inviteEmail" type="email" placeholder="email сотрудника" />
+            <select v-model="inviteRole" aria-label="Роль приглашения">
+              <option value="volunteer">Волонтер</option>
+              <option value="coordinator">Координатор</option>
+              <option value="org_admin">Администратор</option>
+            </select>
+            <button class="primary-action icon-button-wide" type="submit">
+              <MailPlus :size="16" />
+            </button>
+          </form>
+          <p v-if="inviteError" class="form-error">{{ inviteError }}</p>
+          <p v-if="inviteMessage" class="form-success">{{ inviteMessage }}</p>
+          <div class="invite-list compact-list">
+            <article v-for="invite in invitations.slice(0, 4)" :key="invite.id" class="invite-card">
+              <div>
+                <span>{{ invite.email }}</span>
+                <small>{{ invitationStatusLabel(invite.status) }} · {{ invite.role }}</small>
+                <small class="copy-line"><Link2 :size="13" /> {{ invite.link }}</small>
+              </div>
+            </article>
+            <p v-if="!invitations.length" class="muted-text">Приглашений пока нет.</p>
+          </div>
+        </div>
+
+        <div class="module-tool-block">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Загрузка</p>
+              <h2>Импорт волонтеров</h2>
+            </div>
+            <FileSpreadsheet :size="20" />
+          </div>
+          <label class="file-drop">
+            <Upload :size="18" />
+            <span>CSV, TSV или XLSX</span>
+            <input type="file" accept=".csv,.tsv,.xlsx" @change="handleImportFile" />
+          </label>
+          <p v-if="importError" class="form-error">{{ importError }}</p>
+          <p v-if="importMessage" class="form-success">{{ importMessage }}</p>
+          <div v-if="importPreview" class="import-preview">
+            <div class="import-summary">
+              <span>{{ importPreview.validCount }} готово</span>
+              <span>{{ importPreview.errorCount }} с ошибками</span>
+            </div>
+            <div class="import-table">
+              <div v-for="row in importPreview.items.slice(0, 5)" :key="row.row" :class="['import-row', { 'has-errors': row.errors.length }]">
+                <span>#{{ row.row }}</span>
+                <strong>{{ row.email || 'email не указан' }}</strong>
+                <small>{{ row.errors.length ? row.errors.join(', ') : `${row.lastName} ${row.firstName}` }}</small>
+              </div>
+            </div>
+            <button class="primary-action" type="button" :disabled="isImporting || importPreview.validCount === 0" @click="commitImport">
+              Импортировать
+            </button>
+          </div>
         </div>
       </aside>
     </div>
