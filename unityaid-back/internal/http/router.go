@@ -22,6 +22,7 @@ import (
 	"unityaid-back/internal/modules/notifications"
 	"unityaid-back/internal/modules/organizations"
 	"unityaid-back/internal/modules/tasks"
+	"unityaid-back/internal/modules/tenantsettings"
 	"unityaid-back/internal/modules/timeentries"
 	"unityaid-back/internal/modules/users"
 
@@ -87,6 +88,13 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 	canManageContent := auth.RequireRoles("super_admin", "org_admin", "coordinator")
 	canManageOrganizations := auth.RequireRoles("super_admin", "org_admin")
+
+	tenantSettingsRepository := tenantsettings.NewRepository(deps.DB)
+	tenantSettingsService := tenantsettings.NewService(tenantSettingsRepository)
+	tenantSettingsHandler := tenantsettings.NewHandler(tenantSettingsService)
+	tenantSettingsGroup := api.Group("/tenant-settings", authMiddleware, auditMiddleware)
+	tenantSettingsGroup.GET("", tenantSettingsHandler.Get)
+	tenantSettingsGroup.PUT("", canManageOrganizations, tenantSettingsHandler.Update)
 
 	newsRepository := news.NewRepository(deps.DB)
 	newsService := news.NewService(newsRepository)

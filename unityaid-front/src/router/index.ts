@@ -7,6 +7,7 @@ import NewsDetailPage from '../pages/NewsDetailPage.vue'
 import NewsFormPage from '../pages/NewsFormPage.vue'
 import NewsListPage from '../pages/NewsListPage.vue'
 import NotificationsPage from '../pages/NotificationsPage.vue'
+import OnboardingPage from '../pages/OnboardingPage.vue'
 import OrganizationsPage from '../pages/OrganizationsPage.vue'
 import ProfilePage from '../pages/ProfilePage.vue'
 import EventsPage from '../pages/EventsPage.vue'
@@ -48,6 +49,11 @@ export const router = createRouter({
           path: 'profile',
           name: 'profile',
           component: ProfilePage
+        },
+        {
+          path: 'onboarding',
+          name: 'onboarding',
+          component: OnboardingPage
         },
         {
           path: 'settings',
