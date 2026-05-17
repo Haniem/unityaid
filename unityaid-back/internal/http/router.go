@@ -12,6 +12,7 @@ import (
 	"unityaid-back/internal/modules/audit"
 	"unityaid-back/internal/modules/auth"
 	"unityaid-back/internal/modules/certificates"
+	"unityaid-back/internal/modules/dataexports"
 	"unityaid-back/internal/modules/events"
 	"unityaid-back/internal/modules/fieldops"
 	"unityaid-back/internal/modules/files"
@@ -237,6 +238,10 @@ func NewRouter(deps RouterDeps) http.Handler {
 	analyticsGroup.GET("/tasks", analyticsHandler.Tasks)
 	analyticsGroup.GET("/gamification", analyticsHandler.Gamification)
 	analyticsGroup.GET("/audit", analyticsHandler.Audit)
+
+	exportsHandler := dataexports.NewHandler(deps.DB)
+	exportsGroup := api.Group("/exports", authMiddleware, auditMiddleware, canManageContent)
+	exportsGroup.GET("/:kind", exportsHandler.Download)
 
 	knowledgeRepository := knowledge.NewRepository(deps.DB)
 	knowledgeService := knowledge.NewService(knowledgeRepository)

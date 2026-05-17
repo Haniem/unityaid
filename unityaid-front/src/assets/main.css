@@ -2410,6 +2410,28 @@ a {
   overflow-wrap: anywhere;
 }
 
+.export-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.export-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #e4e8f0;
+  border-radius: 8px;
+}
+
+.export-card p {
+  margin: 5px 0 0;
+  color: #657086;
+  line-height: 1.45;
+}
+
 .compact-filter {
   min-width: 180px;
 }
@@ -2971,6 +2993,7 @@ a {
   .event-list,
   .analytics-report-grid,
   .analytics-chart-grid,
+  .export-grid,
   .setup-banner,
   .invite-row,
   .task-board {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { Award, BarChart3, CalendarDays, CheckSquare, ClipboardList, History, UsersRound } from 'lucide-vue-next'
+import { Award, BarChart3, CalendarDays, CheckSquare, ClipboardList, Download, History, UsersRound } from 'lucide-vue-next'
 import {
   fetchAnalyticsAudit,
   fetchAnalyticsEvents,
@@ -10,6 +10,7 @@ import {
   fetchAnalyticsTasks,
   fetchAnalyticsVolunteers
 } from '../entities/analytics/api'
+import { downloadExport, type ExportKind } from '../entities/exports/api'
 import type {
   AnalyticsReport,
   AuditEntry,
@@ -22,7 +23,9 @@ import type {
 const route = useRoute()
 const report = ref<AnalyticsReport | null>(null)
 const errorMessage = ref('')
+const exportMessage = ref('')
 const isLoading = ref(false)
+const isExporting = ref('')
 const from = ref('')
 const to = ref('')
 
@@ -34,6 +37,15 @@ const reports = [
   { code: 'gamification', title: 'Начисления', description: 'Все начисления баллов: кому, сколько и за какое действие.', icon: Award, to: '/analytics/gamification' },
   { code: 'audit', title: 'Действия сотрудников', description: 'Журнал создания, изменения, удаления и служебных операций.', icon: History, to: '/analytics/audit' }
 ]
+
+const exports = [
+  { kind: 'volunteers', title: 'Волонтеры', description: 'Профили, статусы, часы, баллы и контакты.' },
+  { kind: 'events', title: 'Мероприятия', description: 'Список мероприятий, статусы, даты, форматы и лимиты.' },
+  { kind: 'applications', title: 'Заявки', description: 'Заявки волонтеров, статусы, события и сообщения.' },
+  { kind: 'time-entries', title: 'Часы', description: 'Подтвержденные и ожидающие проверки записи времени.' },
+  { kind: 'tasks', title: 'Задачи', description: 'Задачи, статусы, приоритеты, сроки и подтверждение.' },
+  { kind: 'certificates', title: 'Сертификаты', description: 'Выданные документы, часы, коды проверки и даты.' }
+] satisfies Array<{ kind: ExportKind; title: string; description: string }>
 
 const currentReportCode = computed(() => String(route.params.report || ''))
 const currentReport = computed(() => reports.find((item) => item.code === currentReportCode.value))
@@ -119,6 +131,18 @@ function formatAction(entry: AuditEntry) {
   return `${entry.method} ${entry.action}: ${entry.entityType}${id} · ${entry.path}`
 }
 
+async function exportData(kind: ExportKind) {
+  isExporting.value = kind
+  exportMessage.value = ''
+  try {
+    await downloadExport(kind)
+  } catch (error) {
+    exportMessage.value = error instanceof Error ? error.message : 'Не удалось выгрузить данные'
+  } finally {
+    isExporting.value = ''
+  }
+}
+
 watch(() => route.params.report, () => {
   report.value = null
   load()
@@ -145,6 +169,28 @@ onMounted(load)
         </div>
       </RouterLink>
     </div>
+
+    <section v-if="isCatalog" class="detail-panel analytics-top-panel">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Экспорт</p>
+          <h2>Выгрузка ключевых списков</h2>
+        </div>
+      </div>
+      <div class="export-grid">
+        <article v-for="item in exports" :key="item.kind" class="export-card">
+          <div>
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.description }}</p>
+          </div>
+          <button class="secondary-action" type="button" :disabled="isExporting === item.kind" @click="exportData(item.kind)">
+            <Download :size="17" />
+            <span>{{ isExporting === item.kind ? 'Готовим...' : 'CSV' }}</span>
+          </button>
+        </article>
+      </div>
+      <p v-if="exportMessage" class="form-error">{{ exportMessage }}</p>
+    </section>
 
     <template v-else>
       <div class="filter-bar">
