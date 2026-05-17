@@ -94,3 +94,18 @@ type AuditReport struct {
 	Activity []ChartPoint `json:"activity"`
 	Entries  []AuditEntry `json:"entries"`
 }
+
+type ReportRow struct {
+	Label   string  `json:"label"`
+	Group   string  `json:"group"`
+	Value   float64 `json:"value"`
+	Details string  `json:"details"`
+}
+
+type ManagementReport struct {
+	Code    string      `json:"code"`
+	Title   string      `json:"title"`
+	Metrics []Metric    `json:"metrics"`
+	Rows    []ReportRow `json:"rows"`
+	Risks   []ReportRow `json:"risks"`
+}

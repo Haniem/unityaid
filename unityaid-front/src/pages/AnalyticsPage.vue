@@ -3,12 +3,14 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { Award, BarChart3, CalendarDays, CheckSquare, ClipboardList, Download, History, UsersRound } from 'lucide-vue-next'
 import {
+  downloadManagementReport,
   fetchAnalyticsAudit,
   fetchAnalyticsEvents,
   fetchAnalyticsGamification,
   fetchAnalyticsOverview,
   fetchAnalyticsTasks,
-  fetchAnalyticsVolunteers
+  fetchAnalyticsVolunteers,
+  fetchManagementReport
 } from '../entities/analytics/api'
 import { downloadExport, type ExportKind } from '../entities/exports/api'
 import type {
@@ -16,6 +18,7 @@ import type {
   AuditEntry,
   ChartPoint,
   GamificationTransaction,
+  ManagementReportRow,
   Metric,
   TopVolunteer
 } from '../entities/analytics/types'
@@ -28,6 +31,8 @@ const isLoading = ref(false)
 const isExporting = ref('')
 const from = ref('')
 const to = ref('')
+const savedFilterName = ref('')
+const savedFilters = ref<Array<{ name: string; from: string; to: string }>>([])
 
 const reports = [
   { code: 'overview', title: 'Обзор', description: 'Ключевые показатели, заявки, посещаемость и топ волонтеров.', icon: BarChart3, to: '/analytics/overview' },
@@ -36,6 +41,15 @@ const reports = [
   { code: 'tasks', title: 'Задачи', description: 'Выполнение задач, статусы и распределение по приоритетам.', icon: CheckSquare, to: '/analytics/tasks' },
   { code: 'gamification', title: 'Начисления', description: 'Все начисления баллов: кому, сколько и за какое действие.', icon: Award, to: '/analytics/gamification' },
   { code: 'audit', title: 'Действия сотрудников', description: 'Журнал создания, изменения, удаления и служебных операций.', icon: History, to: '/analytics/audit' }
+]
+
+const managementReports = [
+  { code: 'executive', title: 'Executive dashboard', description: 'Сводка для руководителя по ключевым показателям и рискам.', icon: BarChart3, to: '/analytics/executive' },
+  { code: 'management', title: 'Для руководства', description: 'Динамика заявок и операционные показатели периода.', icon: ClipboardList, to: '/analytics/management' },
+  { code: 'grant', title: 'Для грантодателя', description: 'Подтвержденные часы и вклад организаций.', icon: Award, to: '/analytics/grant' },
+  { code: 'branches', title: 'Филиалы', description: 'Активность филиалов, мероприятий и задач.', icon: CalendarDays, to: '/analytics/branches' },
+  { code: 'coordinators', title: 'Координаторы', description: 'Активность сотрудников по аудиту действий.', icon: UsersRound, to: '/analytics/coordinators' },
+  { code: 'risks', title: 'Проблемные зоны', description: 'Ожидающие заявки, часы и ошибки операций.', icon: History, to: '/analytics/risks' }
 ]
 
 const exports = [
@@ -48,12 +62,15 @@ const exports = [
 ] satisfies Array<{ kind: ExportKind; title: string; description: string }>
 
 const currentReportCode = computed(() => String(route.params.report || ''))
-const currentReport = computed(() => reports.find((item) => item.code === currentReportCode.value))
+const currentReport = computed(() => [...reports, ...managementReports].find((item) => item.code === currentReportCode.value))
 const isCatalog = computed(() => !currentReport.value)
 const metrics = computed<Metric[]>(() => report.value?.metrics ?? [])
 const topVolunteers = computed<TopVolunteer[]>(() => ('topVolunteers' in (report.value ?? {}) ? (report.value as any).topVolunteers : []))
 const transactions = computed<GamificationTransaction[]>(() => ('transactions' in (report.value ?? {}) ? (report.value as any).transactions : []))
 const auditEntries = computed<AuditEntry[]>(() => ('entries' in (report.value ?? {}) ? (report.value as any).entries : []))
+const managementRows = computed<ManagementReportRow[]>(() => ('rows' in (report.value ?? {}) ? (report.value as any).rows : []))
+const riskRows = computed<ManagementReportRow[]>(() => ('risks' in (report.value ?? {}) ? (report.value as any).risks : []))
+const isManagementReport = computed(() => managementReports.some((item) => item.code === currentReportCode.value))
 
 const chartSections = computed(() => {
   if (!report.value) return []
@@ -90,6 +107,12 @@ const chartSections = computed(() => {
       { title: 'Начислено по дням', items: item.pointsByDay as ChartPoint[] }
     ]
   }
+  if (isManagementReport.value) {
+    return [
+      { title: 'Строки отчета', items: managementRows.value.map((row) => ({ label: `${row.label}: ${row.group}`, value: row.value })) },
+      { title: 'Риски', items: riskRows.value.map((row) => ({ label: `${row.label}: ${row.group}`, value: row.value })) }
+    ]
+  }
   return [
     { title: 'Действия', items: item.byAction as ChartPoint[] },
     { title: 'Разделы системы', items: item.byEntity as ChartPoint[] },
@@ -109,10 +132,43 @@ async function load() {
     if (currentReportCode.value === 'tasks') report.value = (await fetchAnalyticsTasks(params)).item
     if (currentReportCode.value === 'gamification') report.value = (await fetchAnalyticsGamification(params)).item
     if (currentReportCode.value === 'audit') report.value = (await fetchAnalyticsAudit(params)).item
+    if (isManagementReport.value) report.value = (await fetchManagementReport(currentReportCode.value, params)).item
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить отчет'
   } finally {
     isLoading.value = false
+  }
+}
+
+function loadSavedFilters() {
+  savedFilters.value = JSON.parse(localStorage.getItem('unityaid:report-filters') || '[]')
+}
+
+function saveCurrentFilter() {
+  const name = savedFilterName.value.trim() || `Фильтр ${savedFilters.value.length + 1}`
+  const next = [{ name, from: from.value, to: to.value }, ...savedFilters.value.filter((item) => item.name !== name)].slice(0, 8)
+  savedFilters.value = next
+  localStorage.setItem('unityaid:report-filters', JSON.stringify(next))
+  savedFilterName.value = ''
+}
+
+function applySavedFilter(name: string) {
+  const item = savedFilters.value.find((filter) => filter.name === name)
+  if (!item) return
+  from.value = item.from
+  to.value = item.to
+  load()
+}
+
+async function exportReport(format: 'xlsx' | 'pdf') {
+  exportMessage.value = ''
+  try {
+    await downloadManagementReport(currentReportCode.value, format, {
+      from: from.value ? new Date(from.value).toISOString() : '',
+      to: to.value ? new Date(to.value).toISOString() : ''
+    })
+  } catch (error) {
+    exportMessage.value = error instanceof Error ? error.message : 'Не удалось выгрузить отчет'
   }
 }
 
@@ -147,7 +203,10 @@ watch(() => route.params.report, () => {
   report.value = null
   load()
 })
-onMounted(load)
+onMounted(() => {
+  loadSavedFilters()
+  load()
+})
 </script>
 
 <template>
@@ -161,7 +220,7 @@ onMounted(load)
     </div>
 
     <div v-if="isCatalog" class="analytics-report-grid">
-      <RouterLink v-for="item in reports" :key="item.code" class="analytics-report-card" :to="item.to">
+      <RouterLink v-for="item in [...reports, ...managementReports]" :key="item.code" class="analytics-report-card" :to="item.to">
         <component :is="item.icon" :size="24" />
         <div>
           <strong>{{ item.title }}</strong>
@@ -203,10 +262,25 @@ onMounted(load)
           <input v-model="to" type="date" />
         </label>
         <button class="primary-action" type="button" @click="load">Применить</button>
+        <input v-model="savedFilterName" class="report-filter-name" placeholder="Название фильтра" />
+        <button class="secondary-action" type="button" @click="saveCurrentFilter">Сохранить фильтр</button>
+        <select v-if="savedFilters.length" class="report-filter-name" @change="applySavedFilter(($event.target as HTMLSelectElement).value)">
+          <option value="">Сохраненные фильтры</option>
+          <option v-for="filter in savedFilters" :key="filter.name" :value="filter.name">{{ filter.name }}</option>
+        </select>
+        <button v-if="isManagementReport" class="secondary-action" type="button" @click="exportReport('xlsx')">
+          <Download :size="17" />
+          <span>XLSX</span>
+        </button>
+        <button v-if="isManagementReport" class="secondary-action" type="button" @click="exportReport('pdf')">
+          <Download :size="17" />
+          <span>PDF</span>
+        </button>
         <RouterLink class="secondary-action" to="/analytics">К отчетам</RouterLink>
       </div>
 
       <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
+      <p v-if="exportMessage && isManagementReport" class="form-error">{{ exportMessage }}</p>
       <div v-else-if="isLoading" class="empty-state">Загрузка отчета...</div>
 
       <template v-else-if="report">

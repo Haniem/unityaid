@@ -261,6 +261,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 	analyticsGroup.GET("/tasks", analyticsHandler.Tasks)
 	analyticsGroup.GET("/gamification", analyticsHandler.Gamification)
 	analyticsGroup.GET("/audit", analyticsHandler.Audit)
+	analyticsGroup.GET("/management/:kind", analyticsHandler.Management)
+	analyticsGroup.GET("/management/:kind/export/:format", analyticsHandler.ExportManagement)
 
 	exportsHandler := dataexports.NewHandler(deps.DB)
 	exportsGroup := api.Group("/exports", authMiddleware, auditMiddleware, canManageContent)

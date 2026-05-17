@@ -88,6 +88,21 @@ export type AuditReport = {
   entries: AuditEntry[]
 }
 
+export type ManagementReportRow = {
+  label: string
+  group: string
+  value: number
+  details: string
+}
+
+export type ManagementReport = {
+  code: string
+  title: string
+  metrics: Metric[]
+  rows: ManagementReportRow[]
+  risks: ManagementReportRow[]
+}
+
 export type AnalyticsReport =
   | OverviewReport
   | VolunteersReport
@@ -95,3 +110,4 @@ export type AnalyticsReport =
   | TasksReport
   | GamificationReport
   | AuditReport
+  | ManagementReport

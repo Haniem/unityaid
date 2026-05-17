@@ -33,3 +33,7 @@ func (s *Service) Gamification(ctx context.Context, filters Filters) (Gamificati
 func (s *Service) Audit(ctx context.Context, filters Filters) (AuditReport, error) {
 	return s.repository.Audit(ctx, filters)
 }
+
+func (s *Service) Management(ctx context.Context, kind string, filters Filters) (ManagementReport, error) {
+	return s.repository.Management(ctx, kind, filters)
+}

@@ -1,6 +1,6 @@
-import { apiRequest } from '../../shared/api'
+import { API_BASE_URL, ApiError, apiRequest } from '../../shared/api'
 import { authState } from '../auth/store'
-import type { AuditReport, EventsReport, GamificationReport, OverviewReport, TasksReport, VolunteersReport } from './types'
+import type { AuditReport, EventsReport, GamificationReport, ManagementReport, OverviewReport, TasksReport, VolunteersReport } from './types'
 
 const token = () => authState.token
 
@@ -28,3 +28,27 @@ export const fetchAnalyticsGamification = (params: { from?: string; to?: string 
 
 export const fetchAnalyticsAudit = (params: { from?: string; to?: string } = {}) =>
   apiRequest<{ item: AuditReport }>(`/analytics/audit${query(params)}`, { token: token() })
+
+export const fetchManagementReport = (kind: string, params: { from?: string; to?: string } = {}) =>
+  apiRequest<{ item: ManagementReport }>(`/analytics/management/${kind}${query(params)}`, { token: token() })
+
+export async function downloadManagementReport(kind: string, format: 'xlsx' | 'pdf', params: { from?: string; to?: string } = {}) {
+  const response = await fetch(`${API_BASE_URL}/analytics/management/${kind}/export/${format}${query(params)}`, {
+    headers: {
+      Authorization: `Bearer ${authState.token ?? ''}`
+    }
+  })
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null)
+    throw new ApiError(payload?.message ?? 'Не удалось выгрузить отчет', response.status)
+  }
+  const blob = await response.blob()
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `unityaid-${kind}-report.${format}`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
