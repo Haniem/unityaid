@@ -129,6 +129,11 @@ function cellValue(value: unknown) {
   return String(value)
 }
 
+function columnLabel(column: string) {
+  if (column === 'display_id') return '№'
+  return column
+}
+
 watch(selectedEntityCode, () => {
   page.value = 1
   search.value = ''
@@ -201,7 +206,7 @@ onMounted(async () => {
             <table class="admin-table">
               <thead>
                 <tr>
-                  <th v-for="column in selectedEntity?.columns" :key="column">{{ column }}</th>
+                  <th v-for="column in selectedEntity?.columns" :key="column">{{ columnLabel(column) }}</th>
                   <th>Действия</th>
                 </tr>
               </thead>

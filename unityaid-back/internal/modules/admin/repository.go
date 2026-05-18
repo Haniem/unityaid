@@ -25,7 +25,7 @@ func NewRepository(db *pgxpool.Pool) *Repository {
 func (r *Repository) Entities() []EntityConfig {
 	items := make([]EntityConfig, 0, len(entityConfigs))
 	for _, item := range entityConfigs {
-		items = append(items, item)
+		items = append(items, withDisplayID(item))
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Label < items[j].Label })
 	return items
@@ -36,6 +36,7 @@ func (r *Repository) List(ctx context.Context, code string, page int, limit int,
 	if !ok {
 		return ListResponse{}, ErrUnknownEntity
 	}
+	config = withDisplayID(config)
 	if page < 1 {
 		page = 1
 	}
@@ -73,6 +74,7 @@ func (r *Repository) Create(ctx context.Context, code string, data map[string]an
 	if !ok {
 		return nil, ErrUnknownEntity
 	}
+	config = withDisplayID(config)
 	if !config.CanCreate {
 		return nil, errors.New("entity cannot be created")
 	}
@@ -106,6 +108,7 @@ func (r *Repository) Get(ctx context.Context, code string, id string) (map[strin
 	if !ok {
 		return nil, ErrUnknownEntity
 	}
+	config = withDisplayID(config)
 	var raw string
 	err := r.db.QueryRow(ctx, "SELECT row_to_json(t)::text FROM (SELECT "+strings.Join(config.Columns, ", ")+" FROM "+config.Table+" WHERE "+config.PrimaryKey+" = $1) t", id).Scan(&raw)
 	if err != nil {
@@ -120,6 +123,7 @@ func (r *Repository) Update(ctx context.Context, code string, id string, data ma
 	if !ok {
 		return nil, ErrUnknownEntity
 	}
+	config = withDisplayID(config)
 	columns, values := editableData(config, data)
 	if len(columns) == 0 {
 		return r.Get(ctx, code, id)
@@ -149,6 +153,14 @@ func (r *Repository) Delete(ctx context.Context, code string, id string) error {
 	}
 	_, err := r.db.Exec(ctx, "DELETE FROM "+config.Table+" WHERE "+config.PrimaryKey+" = $1", id)
 	return err
+}
+
+func withDisplayID(config EntityConfig) EntityConfig {
+	if hasColumn(config.Columns, "display_id") {
+		return config
+	}
+	config.Columns = append([]string{"display_id"}, config.Columns...)
+	return config
 }
 
 func editableData(config EntityConfig, data map[string]any) ([]string, []any) {
