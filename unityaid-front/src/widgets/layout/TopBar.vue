@@ -15,7 +15,6 @@ import {
   ListTodo,
   LogOut,
   Menu,
-  MessageCircle,
   Network,
   Newspaper,
   Plus,
@@ -170,7 +169,6 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', closeOutside))
 
     <div class="topbar-actions">
       <button class="icon-button accent" type="button" aria-label="Создать"><Plus :size="20" /></button>
-      <button class="icon-button" type="button" aria-label="Сообщения"><MessageCircle :size="19" /></button>
       <button
         ref="notificationsButtonRef"
         :class="['icon-button', { accent: isNotificationsOpen }]"
