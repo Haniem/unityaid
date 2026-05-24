@@ -1957,6 +1957,20 @@ a {
   align-items: center;
 }
 
+.task-assignment-form {
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 160px);
+}
+
+.task-assignment-form .primary-action {
+  grid-column: 1 / -1;
+  justify-self: start;
+  min-width: 160px;
+}
+
+.task-time-form {
+  grid-template-columns: minmax(110px, 0.7fr) minmax(180px, 1fr) auto;
+}
+
 .inline-member-form input,
 .inline-member-form select,
 .member-row select,
@@ -3399,6 +3413,17 @@ a {
   .dashboard-action-grid,
   .dashboard-contribution {
     grid-template-columns: 1fr;
+  }
+
+  .task-assignment-form,
+  .task-time-form {
+    grid-template-columns: 1fr;
+  }
+
+  .task-assignment-form .primary-action,
+  .task-time-form .primary-action {
+    width: 100%;
+    justify-self: stretch;
   }
 
   .dashboard-row,

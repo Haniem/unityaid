@@ -112,7 +112,7 @@ onMounted(load)
       <div class="management-grid">
         <section class="detail-panel">
           <p class="eyebrow">Исполнители</p>
-          <form class="inline-member-form" @submit.prevent="submitAssignment">
+          <form class="inline-member-form task-assignment-form" @submit.prevent="submitAssignment">
             <input v-model="assignment.userId" placeholder="ID пользователя" required />
             <CustomSelect v-model="assignment.role" :options="assignmentRoleOptions" />
             <button class="primary-action" type="submit">Назначить</button>
@@ -141,7 +141,7 @@ onMounted(load)
 
         <section class="detail-panel">
           <p class="eyebrow">Время и история</p>
-          <form class="inline-member-form" @submit.prevent="submitTime">
+          <form class="inline-member-form task-time-form" @submit.prevent="submitTime">
             <input v-model="timeEntry.hours" type="number" step="0.25" placeholder="часы" required />
             <input v-model="timeEntry.note" placeholder="комментарий" />
             <button class="primary-action" type="submit">Учесть</button>
