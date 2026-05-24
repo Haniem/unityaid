@@ -106,7 +106,7 @@ onMounted(load)
           <div><Clock3 :size="18" /><span>Срок: {{ formatDateTime(item.dueAt) }}</span></div>
           <div><LinkIcon :size="18" /><span>{{ item.eventTitle || 'Без мероприятия' }}</span></div>
         </div>
-        <button class="primary-action" type="button" @click="confirmDone">Подтвердить выполнение</button>
+        <button class="primary-action task-confirm-action" type="button" @click="confirmDone">Подтвердить выполнение</button>
       </div>
 
       <div class="management-grid">
