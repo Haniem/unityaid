@@ -106,13 +106,13 @@ onMounted(load)
           <div><Clock3 :size="18" /><span>Срок: {{ formatDateTime(item.dueAt) }}</span></div>
           <div><LinkIcon :size="18" /><span>{{ item.eventTitle || 'Без мероприятия' }}</span></div>
         </div>
-        <button class="primary-action" type="button" @click="confirmDone">Подтвердить выполнение</button>
+        <button class="primary-action task-confirm-action" type="button" @click="confirmDone">Подтвердить выполнение</button>
       </div>
 
       <div class="management-grid">
         <section class="detail-panel">
           <p class="eyebrow">Исполнители</p>
-          <form class="inline-member-form" @submit.prevent="submitAssignment">
+          <form class="inline-member-form task-assignment-form" @submit.prevent="submitAssignment">
             <input v-model="assignment.userId" placeholder="ID пользователя" required />
             <CustomSelect v-model="assignment.role" :options="assignmentRoleOptions" />
             <button class="primary-action" type="submit">Назначить</button>
@@ -141,7 +141,7 @@ onMounted(load)
 
         <section class="detail-panel">
           <p class="eyebrow">Время и история</p>
-          <form class="inline-member-form" @submit.prevent="submitTime">
+          <form class="inline-member-form task-time-form" @submit.prevent="submitTime">
             <input v-model="timeEntry.hours" type="number" step="0.25" placeholder="часы" required />
             <input v-model="timeEntry.note" placeholder="комментарий" />
             <button class="primary-action" type="submit">Учесть</button>
