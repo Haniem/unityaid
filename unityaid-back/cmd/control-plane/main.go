@@ -55,7 +55,7 @@ func main() {
 	router := gin.New()
 	router.Use(gin.Recovery())
 	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"service": "unityaid-control-plane", "status": "ok"})
+		c.JSON(http.StatusOK, gin.H{"service": "puls-control-plane", "status": "ok"})
 	})
 
 	api := router.Group("/api/v1", service.requireAPIKey)

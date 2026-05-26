@@ -1,4 +1,4 @@
-const CACHE_NAME = 'unityaid-shell-v1'
+const CACHE_NAME = 'puls-shell-v1'
 const SHELL_URLS = ['/', '/manifest.webmanifest', '/pwa-icon.svg']
 
 self.addEventListener('install', (event) => {

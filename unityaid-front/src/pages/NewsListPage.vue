@@ -89,7 +89,7 @@ onMounted(async () => {
       <article v-for="item in pageItems" :key="item.id" class="news-card">
         <RouterLink :to="`/news/${item.id}`" class="news-card-main">
           <img v-if="item.coverImageUrl" :src="item.coverImageUrl" alt="" />
-          <div v-else class="news-cover-placeholder">UnityAid</div>
+          <div v-else class="news-cover-placeholder">Пульс</div>
           <div class="news-card-body">
             <span class="status-pill">{{ item.status }} · {{ item.categoryName || 'без категории' }}</span>
             <h2>{{ item.title }}</h2>

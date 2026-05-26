@@ -10,7 +10,7 @@ const title = computed(() => String(route.meta.title ?? 'Раздел в раз�
   <section class="page-section">
     <div class="page-heading">
       <div>
-        <p class="eyebrow">UnityAid</p>
+        <p class="eyebrow">Пульс</p>
         <h1>{{ title }}</h1>
       </div>
       <p>Этот раздел уже добавлен в навигацию и будет наполнен функционалом в следующих итерациях.</p>

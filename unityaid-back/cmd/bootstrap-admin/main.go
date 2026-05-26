@@ -24,7 +24,7 @@ func main() {
 	email := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_EMAIL"))
 	password := os.Getenv("BOOTSTRAP_ADMIN_PASSWORD")
 	firstName := strings.TrimSpace(getEnv("BOOTSTRAP_ADMIN_FIRST_NAME", "Admin"))
-	lastName := strings.TrimSpace(getEnv("BOOTSTRAP_ADMIN_LAST_NAME", "UnityAid"))
+	lastName := strings.TrimSpace(getEnv("BOOTSTRAP_ADMIN_LAST_NAME", "Пульс"))
 	patronymic := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_PATRONYMIC"))
 	organizationName := strings.TrimSpace(getEnv("BOOTSTRAP_ORGANIZATION_NAME", "Default organization"))
 	organizationSlug := strings.TrimSpace(getEnv("BOOTSTRAP_ORGANIZATION_SLUG", "default"))

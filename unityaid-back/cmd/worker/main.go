@@ -19,7 +19,7 @@ func main() {
 	queueName := getEnv("WORKER_QUEUE", "default")
 	concurrency := getEnvInt("WORKER_CONCURRENCY", 2)
 
-	logger.Info("unityaid worker started", "redis_url", redisURL, "queue", queueName, "concurrency", concurrency)
+	logger.Info("puls worker started", "redis_url", redisURL, "queue", queueName, "concurrency", concurrency)
 
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
@@ -27,10 +27,10 @@ func main() {
 	for {
 		select {
 		case <-ctx.Done():
-			logger.Info("unityaid worker stopped")
+			logger.Info("puls worker stopped")
 			return
 		case <-ticker.C:
-			logger.Info("unityaid worker heartbeat", "queue", queueName)
+			logger.Info("puls worker heartbeat", "queue", queueName)
 		}
 	}
 }

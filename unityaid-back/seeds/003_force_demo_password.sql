@@ -6,7 +6,7 @@ SET
 	is_email_verified = true,
 	updated_at = now()
 WHERE email IN (
-	'admin@unityaid.test',
+	'admin@puls.test',
 	'org.admin@dobrye-ruki.test',
 	'coord@dobrye-ruki.test',
 	'volunteer1@test.local',

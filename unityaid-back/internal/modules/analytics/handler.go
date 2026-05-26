@@ -90,12 +90,12 @@ func (h *Handler) ExportManagement(c *gin.Context) {
 	format := c.Param("format")
 	if format == "pdf" {
 		c.Header("Content-Type", "application/pdf")
-		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="unityaid-%s-report.pdf"`, item.Code))
+		c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="puls-%s-report.pdf"`, item.Code))
 		c.String(http.StatusOK, renderReportText(item))
 		return
 	}
 	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="unityaid-%s-report.xlsx"`, item.Code))
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="puls-%s-report.xlsx"`, item.Code))
 	c.String(http.StatusOK, renderReportCSV(item))
 }
 

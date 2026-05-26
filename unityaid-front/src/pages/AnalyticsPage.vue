@@ -215,7 +215,7 @@ onMounted(() => {
       <div>
         <p class="eyebrow">Аналитика</p>
         <h1>{{ currentReport?.title || 'Отчеты' }}</h1>
-        <p>{{ currentReport?.description || 'Выберите отчет, чтобы посмотреть управленческие показатели UnityAid.' }}</p>
+        <p>{{ currentReport?.description || 'Выберите отчет, чтобы посмотреть управленческие показатели системы «Пульс».' }}</p>
       </div>
     </div>
 

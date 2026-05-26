@@ -20,7 +20,7 @@ func NewHealthHandler(db *pgxpool.Pool) *HealthHandler {
 func (h *HealthHandler) Health(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"status":  "ok",
-		"service": "unityaid-back",
+		"service": "puls-back",
 	})
 }
 

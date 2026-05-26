@@ -23,6 +23,7 @@ import (
 	"unityaid-back/internal/modules/news"
 	"unityaid-back/internal/modules/notifications"
 	"unityaid-back/internal/modules/organizations"
+	"unityaid-back/internal/modules/profilefields"
 	"unityaid-back/internal/modules/tasks"
 	"unityaid-back/internal/modules/tenantsettings"
 	"unityaid-back/internal/modules/timeentries"
@@ -117,6 +118,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	filesGroup := api.Group("/files", authMiddleware, auditMiddleware)
 	filesGroup.POST("/news-images", canManageContent, filesHandler.UploadNewsImage)
 	filesGroup.POST("/organization-logos", canManageOrganizations, filesHandler.UploadOrganizationLogo)
+	filesGroup.POST("/profile-avatars", filesHandler.UploadProfileAvatar)
 
 	formsRepository := forms.NewRepository(deps.DB)
 	formsService := forms.NewService(formsRepository)
@@ -159,6 +161,20 @@ func NewRouter(deps RouterDeps) http.Handler {
 	volunteersGroup.GET("", usersHandler.ListVolunteers)
 	volunteersGroup.GET("/:id", usersHandler.GetVolunteer)
 	volunteersGroup.PATCH("/:id", usersHandler.UpdateVolunteer)
+
+	profileFieldsRepository := profilefields.NewRepository(deps.DB)
+	profileFieldsService := profilefields.NewService(profileFieldsRepository)
+	profileFieldsHandler := profilefields.NewHandler(profileFieldsService, authorizer)
+	profileFieldsGroup := api.Group("/profile-fields", authMiddleware, auditMiddleware)
+	profileFieldsGroup.GET("/schema", profileFieldsHandler.Schema)
+	profileFieldsGroup.GET("/users/:userId", profileFieldsHandler.Values)
+	profileFieldsGroup.PUT("/users/:userId", profileFieldsHandler.SaveValues)
+	profileFieldsGroup.POST("/groups", profileFieldsHandler.CreateGroup)
+	profileFieldsGroup.PUT("/groups/:id", profileFieldsHandler.UpdateGroup)
+	profileFieldsGroup.DELETE("/groups/:id", profileFieldsHandler.DeleteGroup)
+	profileFieldsGroup.POST("/fields", profileFieldsHandler.CreateField)
+	profileFieldsGroup.PUT("/fields/:id", profileFieldsHandler.UpdateField)
+	profileFieldsGroup.DELETE("/fields/:id", profileFieldsHandler.DeleteField)
 
 	invitationsRepository := invitations.NewRepository(deps.DB)
 	invitationsService := invitations.NewService(invitationsRepository)

@@ -27,7 +27,7 @@ function isActive(path: string) {
     <div class="sidebar-brand">
       <div class="logo-mark"><Building2 :size="22" /></div>
       <div v-if="!collapsed">
-        <strong>UnityAid</strong>
+        <strong>Пульс</strong>
         <span>volunteer hub</span>
       </div>
     </div>

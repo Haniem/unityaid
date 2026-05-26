@@ -4,12 +4,12 @@ import { authState } from '../auth/store'
 export type ExportKind = 'volunteers' | 'events' | 'applications' | 'time-entries' | 'tasks' | 'certificates'
 
 const filenames: Record<ExportKind, string> = {
-  volunteers: 'unityaid-volunteers.csv',
-  events: 'unityaid-events.csv',
-  applications: 'unityaid-applications.csv',
-  'time-entries': 'unityaid-time-entries.csv',
-  tasks: 'unityaid-tasks.csv',
-  certificates: 'unityaid-certificates.csv'
+  volunteers: 'puls-volunteers.csv',
+  events: 'puls-events.csv',
+  applications: 'puls-applications.csv',
+  'time-entries': 'puls-time-entries.csv',
+  tasks: 'puls-tasks.csv',
+  certificates: 'puls-certificates.csv'
 }
 
 export async function downloadExport(kind: ExportKind) {

@@ -186,7 +186,7 @@ onMounted(load)
           <div>
             <p class="eyebrow">{{ typeLabels[item.type] }}</p>
             <h2>{{ item.title }}</h2>
-            <p>{{ item.description || 'Документ сформирован в системе UnityAid.' }}</p>
+            <p>{{ item.description || 'Документ сформирован в системе «Пульс».' }}</p>
             <div class="certificate-meta">
               <span>{{ item.totalHours }} ч.</span>
               <span>{{ item.verifyCode }}</span>

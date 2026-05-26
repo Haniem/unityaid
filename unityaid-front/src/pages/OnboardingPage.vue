@@ -13,7 +13,7 @@ const saveMessage = ref('')
 const inviteEmail = ref('')
 const inviteRole = ref<PendingInvite['role']>('coordinator')
 const form = ref<TenantSettingsPayload>({
-  displayName: 'UnityAid',
+  displayName: 'Пульс',
   description: '',
   logoUrl: null,
   primaryColor: '#2f9f72',

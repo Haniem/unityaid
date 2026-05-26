@@ -1,6 +1,6 @@
 CREATE TABLE IF NOT EXISTS tenant_settings (
 	id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-	display_name TEXT NOT NULL DEFAULT 'UnityAid',
+	display_name TEXT NOT NULL DEFAULT 'Пульс',
 	description TEXT NOT NULL DEFAULT '',
 	logo_url TEXT,
 	primary_color TEXT NOT NULL DEFAULT '#2f9f72',

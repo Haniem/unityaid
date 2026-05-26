@@ -97,7 +97,7 @@ onMounted(async () => {
             <span class="status-pill">{{ item.status }} · {{ item.categoryName || 'без категории' }}</span>
             <h2>{{ item.title }}</h2>
             <p>{{ item.summary || 'Краткое описание пока не заполнено.' }}</p>
-            <small>{{ item.authorName || 'UnityAid' }} · {{ formatDate(item.publishedAt || item.createdAt) }}</small>
+            <small>{{ item.authorName || 'Пульс' }} · {{ formatDate(item.publishedAt || item.createdAt) }}</small>
           </div>
         </RouterLink>
         <div class="card-actions">

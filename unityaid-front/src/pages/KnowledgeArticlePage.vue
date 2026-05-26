@@ -37,7 +37,7 @@ onMounted(async () => {
           <p class="eyebrow">{{ item.categoryName || 'База знаний' }}</p>
           <h1>{{ item.title }}</h1>
           <p>{{ item.summary }}</p>
-          <small>{{ item.authorName || 'UnityAid' }} · {{ formatDate(item.publishedAt || item.createdAt) }}</small>
+          <small>{{ item.authorName || 'Пульс' }} · {{ formatDate(item.publishedAt || item.createdAt) }}</small>
         </div>
         <RouterLink class="secondary-action" :to="`/knowledge-base/${item.id}/edit`">
           <Pencil :size="18" />

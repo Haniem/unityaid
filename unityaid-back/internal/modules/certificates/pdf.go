@@ -9,13 +9,13 @@ import (
 
 func BuildPDF(item Certificate) []byte {
 	lines := []string{
-		"UnityAid",
+		"Пульс",
 		item.Title,
 		"Recipient: " + item.UserName,
 		fmt.Sprintf("Approved volunteer hours: %.1f", item.TotalHours),
 		"Issued at: " + item.IssuedAt.Format("02.01.2006"),
 		"Verification code: " + item.VerifyCode,
-		"Verify in UnityAid using this code.",
+		"Проверить код можно в системе Пульс.",
 	}
 	if item.OrganizationName != nil {
 		lines = append(lines[:3], append([]string{"Organization: " + *item.OrganizationName}, lines[3:]...)...)
@@ -25,7 +25,7 @@ func BuildPDF(item Certificate) []byte {
 	}
 
 	var content strings.Builder
-	content.WriteString("BT\n/F1 24 Tf\n72 760 Td\n(UnityAid Certificate) Tj\n")
+	content.WriteString("BT\n/F1 24 Tf\n72 760 Td\n(Пульс - сертификат) Tj\n")
 	content.WriteString("/F1 13 Tf\n0 -42 Td\n")
 	for _, line := range lines {
 		content.WriteString("(" + pdfEscape(line) + ") Tj\n0 -24 Td\n")

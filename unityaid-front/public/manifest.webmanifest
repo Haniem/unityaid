@@ -1,6 +1,6 @@
 {
-  "name": "UnityAid",
-  "short_name": "UnityAid",
+  "name": "Пульс",
+  "short_name": "Пульс",
   "description": "Volunteer program management workspace",
   "start_url": "/",
   "display": "standalone",

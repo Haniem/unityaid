@@ -37,7 +37,7 @@ func (s *Service) Upsert(ctx context.Context, request UpsertRequest) (TenantSett
 }
 
 func normalizeRequest(request UpsertRequest) UpsertRequest {
-	request.DisplayName = fallback(strings.TrimSpace(request.DisplayName), "UnityAid")
+	request.DisplayName = fallback(strings.TrimSpace(request.DisplayName), "Пульс")
 	request.Description = strings.TrimSpace(request.Description)
 	request.LogoURL = normalizeOptional(request.LogoURL)
 	request.PrimaryColor = fallback(strings.TrimSpace(request.PrimaryColor), "#2f9f72")

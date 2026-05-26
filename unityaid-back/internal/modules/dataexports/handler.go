@@ -26,7 +26,7 @@ func NewHandler(db *pgxpool.Pool) *Handler {
 
 var definitions = map[string]exportDefinition{
 	"volunteers": {
-		filename: "unityaid-volunteers.csv",
+		filename: "puls-volunteers.csv",
 		query: `
 			SELECT u.id::text, u.email, u.last_name, u.first_name, COALESCE(u.patronymic, '') AS patronymic,
 				COALESCE(vp.status::text, '') AS status, COALESCE(vp.city, '') AS city, COALESCE(vp.phone, '') AS phone,
@@ -38,7 +38,7 @@ var definitions = map[string]exportDefinition{
 		`,
 	},
 	"events": {
-		filename: "unityaid-events.csv",
+		filename: "puls-events.csv",
 		query: `
 			SELECT e.id::text, o.name AS organization, e.title, e.description, e.format::text, e.status::text,
 				e.starts_at, e.ends_at, COALESCE(e.location, '') AS location, COALESCE(e.max_participants, 0) AS max_participants,
@@ -49,7 +49,7 @@ var definitions = map[string]exportDefinition{
 		`,
 	},
 	"applications": {
-		filename: "unityaid-applications.csv",
+		filename: "puls-applications.csv",
 		query: `
 			SELECT ea.id::text, e.title AS event, o.name AS organization, u.email, u.last_name, u.first_name,
 				ea.status::text, ea.message, ea.created_at, ea.updated_at
@@ -61,7 +61,7 @@ var definitions = map[string]exportDefinition{
 		`,
 	},
 	"time-entries": {
-		filename: "unityaid-time-entries.csv",
+		filename: "puls-time-entries.csv",
 		query: `
 			SELECT te.id::text, o.name AS organization, u.email, u.last_name, u.first_name,
 				COALESCE(e.title, '') AS event, COALESCE(t.title, '') AS task, te.hours, te.status,
@@ -75,7 +75,7 @@ var definitions = map[string]exportDefinition{
 		`,
 	},
 	"tasks": {
-		filename: "unityaid-tasks.csv",
+		filename: "puls-tasks.csv",
 		query: `
 			SELECT t.id::text, o.name AS organization, COALESCE(e.title, '') AS event, t.title, t.description,
 				t.status::text, t.priority, t.due_at, t.completion_confirmed_at, t.created_at
@@ -86,7 +86,7 @@ var definitions = map[string]exportDefinition{
 		`,
 	},
 	"certificates": {
-		filename: "unityaid-certificates.csv",
+		filename: "puls-certificates.csv",
 		query: `
 			SELECT c.id::text, u.email, u.last_name, u.first_name, COALESCE(o.name, '') AS organization,
 				c.type, c.title, c.description, c.total_hours, c.verify_code, c.issued_at, c.created_at

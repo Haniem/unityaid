@@ -12,7 +12,7 @@ ON CONFLICT (id) DO UPDATE SET
 -- Пароль для всех демо-пользователей: password
 INSERT INTO users (id, email, password_hash, first_name, last_name, patronymic, avatar_url, locale, is_active, is_email_verified)
 VALUES
-	('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'admin@unityaid.test', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Павел', 'Зозин', 'Алексеевич', 'https://i.pravatar.cc/160?img=12', 'ru', true, true),
+	('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'admin@puls.test', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Павел', 'Зозин', 'Алексеевич', 'https://i.pravatar.cc/160?img=12', 'ru', true, true),
 	('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'org.admin@dobrye-ruki.test', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Анна', 'Крылова', 'Игоревна', 'https://i.pravatar.cc/160?img=5', 'ru', true, true),
 	('cccccccc-cccc-cccc-cccc-cccccccccccc', 'coord@dobrye-ruki.test', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Мария', 'Соколова', 'Петровна', 'https://i.pravatar.cc/160?img=9', 'ru', true, true),
 	('dddddddd-dddd-dddd-dddd-dddddddddddd', 'volunteer1@test.local', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Илья', 'Морозов', NULL, 'https://i.pravatar.cc/160?img=15', 'ru', true, true),

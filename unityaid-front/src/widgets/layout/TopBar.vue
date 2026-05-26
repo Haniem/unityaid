@@ -156,7 +156,7 @@ onBeforeUnmount(() => document.removeEventListener('mousedown', closeOutside))
       <RouterLink class="topbar-brand" to="/">
         <span class="logo-mark"><Building2 :size="22" /></span>
         <span>
-          <strong>UnityAid</strong>
+          <strong>Пульс</strong>
           <small>volunteer hub</small>
         </span>
       </RouterLink>

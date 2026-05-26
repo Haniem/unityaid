@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS points_transactions (
 
 INSERT INTO achievements (code, name, description, icon, points_reward)
 VALUES
-	('registration', 'Первый шаг', 'Регистрация в системе UnityAid.', 'user-plus', 20),
+	('registration', 'Первый шаг', 'Регистрация в системе «Пульс».', 'user-plus', 20),
 	('profile_completed', 'Профиль заполнен', 'Заполнены основные данные профиля волонтера.', 'id-card', 30),
 	('first_participation', 'Первое участие', 'Волонтер впервые отмечен на мероприятии.', 'calendar-check', 50),
 	('task_completed', 'Задача выполнена', 'Волонтер участвовал в выполненной задаче.', 'check-circle', 50),

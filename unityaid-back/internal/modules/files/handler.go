@@ -29,6 +29,10 @@ func (h *Handler) UploadOrganizationLogo(c *gin.Context) {
 	h.uploadImage(c, "organizations")
 }
 
+func (h *Handler) UploadProfileAvatar(c *gin.Context) {
+	h.uploadImage(c, "avatars")
+}
+
 func (h *Handler) uploadImage(c *gin.Context, folder string) {
 	file, err := c.FormFile("file")
 	if err != nil {

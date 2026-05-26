@@ -26,6 +26,7 @@ import TaskDetailPage from '../pages/TaskDetailPage.vue'
 import TimeEntriesPage from '../pages/TimeEntriesPage.vue'
 import VolunteersPage from '../pages/VolunteersPage.vue'
 import SettingsPage from '../pages/SettingsPage.vue'
+import ProfileFieldsSettingsPage from '../pages/ProfileFieldsSettingsPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -64,6 +65,11 @@ export const router = createRouter({
           path: 'settings/:section',
           name: 'settings-section',
           component: SettingsPage
+        },
+        {
+          path: 'settings/profile-fields/manage',
+          name: 'profile-fields-settings',
+          component: ProfileFieldsSettingsPage
         },
         {
           path: 'admin',

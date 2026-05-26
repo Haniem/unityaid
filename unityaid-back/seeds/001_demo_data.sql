@@ -7,7 +7,7 @@ ON CONFLICT (id) DO NOTHING;
 -- Пароль для всех демо-пользователей: password
 INSERT INTO users (id, email, password_hash, first_name, last_name, patronymic, avatar_url, locale)
 VALUES
-	('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'admin@unityaid.test', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Павел', 'Зозин', 'Алексеевич', 'https://i.pravatar.cc/160?img=12', 'ru'),
+	('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'admin@puls.test', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Павел', 'Зозин', 'Алексеевич', 'https://i.pravatar.cc/160?img=12', 'ru'),
 	('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'org.admin@dobrye-ruki.test', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Анна', 'Крылова', 'Игоревна', 'https://i.pravatar.cc/160?img=5', 'ru'),
 	('cccccccc-cccc-cccc-cccc-cccccccccccc', 'coord@dobrye-ruki.test', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Мария', 'Соколова', 'Петровна', 'https://i.pravatar.cc/160?img=9', 'ru'),
 	('dddddddd-dddd-dddd-dddd-dddddddddddd', 'volunteer1@test.local', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', 'Илья', 'Морозов', NULL, 'https://i.pravatar.cc/160?img=15', 'ru'),

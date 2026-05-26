@@ -45,8 +45,8 @@ const saveMessage = ref('')
 const moduleSaveMessage = ref('')
 const isSaving = ref(false)
 const organizationSettings = ref({
-  displayName: 'UnityAid',
-  contactEmail: 'hello@unityaid.test',
+  displayName: 'Пульс',
+  contactEmail: 'hello@puls.test',
   timezone: 'Asia/Yekaterinburg',
   defaultBranch: 'Главное подразделение',
   membershipPolicy: 'manual'
@@ -135,6 +135,14 @@ const sections: SettingsSection[] = [
     icon: UsersRound,
     access: 'client-admin',
     items: ['Приглашения', 'Роли', 'Права доступа', 'Статусы волонтеров']
+  },
+  {
+    id: 'profile-fields',
+    title: 'Поля профиля',
+    description: 'Системные и пользовательские группы полей для карточки волонтера.',
+    icon: SlidersHorizontal,
+    access: 'client-admin',
+    items: ['Группы', 'Пользовательские поля', 'Обязательность', 'Доступность']
   },
   {
     id: 'events',
@@ -341,7 +349,7 @@ onMounted(load)
         v-for="section in filteredSettingsSections"
         :key="section.id"
         class="settings-card"
-        :to="section.id === 'system-admin' ? '/admin' : `/settings/${section.id}`"
+        :to="section.id === 'system-admin' ? '/admin' : section.id === 'profile-fields' ? '/settings/profile-fields/manage' : `/settings/${section.id}`"
       >
         <span class="settings-card-icon">
           <component :is="section.icon" :size="24" />

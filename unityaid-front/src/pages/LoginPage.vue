@@ -16,7 +16,7 @@ const route = useRoute()
 const router = useRouter()
 
 const mode = ref<AuthMode>('login')
-const email = ref('admin@unityaid.test')
+const email = ref('admin@puls.test')
 const password = ref('password')
 const firstName = ref('')
 const lastName = ref('')
@@ -106,7 +106,7 @@ async function submit() {
     <section class="auth-visual">
       <div class="brand-lockup">
         <span class="brand-mark"><HeartHandshake :size="28" /></span>
-        <span>UnityAid</span>
+        <span>Пульс</span>
       </div>
       <h1>Управление волонтерами, задачами и вкладом в одном месте</h1>
       <p>
@@ -167,7 +167,7 @@ async function submit() {
         </button>
 
         <div class="demo-hint">
-          <strong>Демо:</strong> admin@unityaid.test / password
+          <strong>Демо:</strong> admin@puls.test / password
         </div>
       </form>
     </section>

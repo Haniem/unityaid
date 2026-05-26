@@ -189,7 +189,7 @@ func volunteerForm(action string, skills []PossibleValue) Form {
 			textField("Имя", "firstName", true, 120, "Имя волонтера."),
 			textField("Фамилия", "lastName", true, 120, "Фамилия волонтера."),
 			textField("Отчество", "patronymic", false, 120, "Если используется в документах."),
-			{Name: "Аватар", Code: "avatarUrl", Type: "url", Require: false, Value: nil, Placeholder: "https://...", Help: "Ссылка на изображение профиля."},
+			{Name: "Аватар", Code: "avatarUrl", Type: "file", Require: false, Value: nil, UploadEndpoint: "/files/profile-avatars", Accept: "image/*", Help: "Загрузите JPG, PNG, WEBP или GIF размером до 5 МБ."},
 			textField("Город", "city", false, 120, "Город, где волонтер чаще всего участвует."),
 			{Name: "Телефон", Code: "phone", Type: "tel", Require: false, Value: nil, Placeholder: "+7 900 000-00-00", Help: "Телефон для связи координатора."},
 			selectField("Статус", "status", true, "active", statusValues(option("new", "Новый"), option("active", "Активный"), option("unavailable", "Временно недоступен"), option("archived", "Архивный")), "Рабочий статус волонтера для координаторов и фильтрации команды."),

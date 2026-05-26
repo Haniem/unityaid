@@ -1,0 +1,77 @@
+name: Puls quality gate
+
+on:
+  push:
+    branches: ["main", "develop", "codex/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend verification
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: unityaid-back
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: unityaid-back/go.mod
+          cache-dependency-path: unityaid-back/go.sum
+      - name: Download modules
+        run: go mod download
+      - name: Static checks
+        run: go vet ./...
+      - name: Unit and package tests
+        run: go test ./...
+      - name: Build services
+        run: go build ./...
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: unityaid-front
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: unityaid-front/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Type check and production build
+        run: npm run build
+
+  containers:
+    name: Container smoke test
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Validate compose definition
+        run: docker compose config --quiet
+      - name: Build service images
+        run: docker compose build backend frontend
+      - name: Start application
+        run: docker compose up -d --wait db backend frontend
+      - name: Check backend and frontend endpoints
+        run: |
+          curl --fail --retry 5 --retry-delay 2 http://localhost:8080/api/v1/health
+          curl --fail --retry 5 --retry-delay 2 http://localhost:5173
+      - name: Publish container diagnostics on failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop application
+        if: always()
+        run: docker compose down -v
