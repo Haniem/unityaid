@@ -1,0 +1,17 @@
+{
+  "name": "Пульс",
+  "short_name": "Пульс",
+  "description": "Volunteer program management workspace",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f6f8fb",
+  "theme_color": "#21966f",
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

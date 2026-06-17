@@ -1,0 +1,9 @@
+.git
+.idea
+.vscode
+bin
+uploads
+tmp
+*.log
+.env
+Dockerfile*
