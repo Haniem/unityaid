@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import { Building2, CalendarDays, Clock3, Home, ListTodo, Network, Newspaper, UsersRound } from 'lucide-vue-next'
+import { Building2, CalendarDays, Clock3, Gift, Home, ListTodo, Network, Newspaper, UsersRound } from 'lucide-vue-next'
 
 defineProps<{ collapsed: boolean }>()
 defineEmits<{ toggle: [] }>()
@@ -11,6 +11,7 @@ const items = [
   { label: 'Задачи', icon: ListTodo, to: '/tasks' },
   { label: 'События', icon: CalendarDays, to: '/calendar' },
   { label: 'Мои часы', icon: Clock3, to: '/time-entries' },
+  { label: 'Магазин', icon: Gift, to: '/shop' },
   { label: 'Волонтеры', icon: UsersRound, to: '/volunteers' },
   { label: 'Организации', icon: Network, to: '/organizations' },
   { label: 'Новости', icon: Newspaper, to: '/news' }

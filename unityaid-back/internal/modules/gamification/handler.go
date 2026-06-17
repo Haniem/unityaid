@@ -27,6 +27,15 @@ func (h *Handler) Me(c *gin.Context) {
 	c.JSON(http.StatusOK, MeResponse{Item: item})
 }
 
+func (h *Handler) UserProfile(c *gin.Context) {
+	item, err := h.service.Profile(c.Request.Context(), c.Param("userId"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not load gamification profile"})
+		return
+	}
+	c.JSON(http.StatusOK, MeResponse{Item: item})
+}
+
 func (h *Handler) Leaderboard(c *gin.Context) {
 	items, err := h.service.Leaderboard(c.Request.Context())
 	if err != nil {

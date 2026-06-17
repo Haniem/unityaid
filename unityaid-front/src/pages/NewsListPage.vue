@@ -24,9 +24,16 @@ const statusOptions = [
   { id: 'published', name: 'Опубликовано' }
 ]
 
+const statusLabels: Record<string, string> = {
+  draft: 'Черновик',
+  scheduled: 'Запланировано',
+  published: 'Опубликовано'
+}
+
 async function loadNews() {
   isLoading.value = true
   errorMessage.value = ''
+  page.value = 1
   try {
     const response = await fetchNewsList({ search: search.value, status: status.value, categoryId: categoryId.value })
     items.value = response.items
@@ -87,19 +94,21 @@ onMounted(async () => {
 
     <div v-else class="news-grid">
       <article v-for="item in pageItems" :key="item.id" class="news-card">
-        <RouterLink :to="`/news/${item.id}`" class="news-card-main">
+        <RouterLink :to="`/news/${item.id}`" class="news-card-cover" aria-label="Открыть новость">
           <img v-if="item.coverImageUrl" :src="item.coverImageUrl" alt="" />
           <div v-else class="news-cover-placeholder">Пульс</div>
-          <div class="news-card-body">
-            <span class="status-pill">{{ item.status }} · {{ item.categoryName || 'без категории' }}</span>
-            <h2>{{ item.title }}</h2>
-            <p>{{ item.summary || 'Краткое описание пока не заполнено.' }}</p>
-            <small>{{ item.organizationName || 'Без организации' }} · {{ formatDate(item.scheduledAt || item.publishedAt || item.createdAt) }}</small>
-          </div>
         </RouterLink>
-        <div class="card-actions">
-          <RouterLink class="icon-button" :to="`/news/${item.id}/edit`" aria-label="Редактировать"><Pencil :size="17" /></RouterLink>
-          <button class="icon-button" type="button" aria-label="Удалить" @click="removeNews(item)"><Trash2 :size="17" /></button>
+        <div class="news-card-body">
+          <span class="status-pill">{{ statusLabels[item.status] || item.status }} · {{ item.categoryName || 'без категории' }}</span>
+          <RouterLink :to="`/news/${item.id}`" class="news-card-title"><h2>{{ item.title }}</h2></RouterLink>
+          <p>{{ item.summary || 'Краткое описание пока не заполнено.' }}</p>
+          <div class="news-card-footer">
+            <small>{{ item.organizationName || 'Без организации' }} · {{ formatDate(item.scheduledAt || item.publishedAt || item.createdAt) }}</small>
+            <div class="card-actions">
+              <RouterLink class="icon-button" :to="`/news/${item.id}/edit`" aria-label="Редактировать"><Pencil :size="17" /></RouterLink>
+              <button class="icon-button" type="button" aria-label="Удалить" @click="removeNews(item)"><Trash2 :size="17" /></button>
+            </div>
+          </div>
         </div>
       </article>
     </div>

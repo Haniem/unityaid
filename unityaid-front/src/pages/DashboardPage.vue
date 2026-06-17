@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { Bell, CalendarDays, CheckCircle2, Clock3, FileText, Newspaper, Plus, Settings, Trophy, UsersRound } from 'lucide-vue-next'
+import { Bell, CalendarDays, CheckCircle2, Clock3, Newspaper, Trophy, UsersRound } from 'lucide-vue-next'
 import { authState } from '../entities/auth/store'
 import { fetchEvents } from '../entities/events/api'
 import type { EventItem } from '../entities/events/types'
@@ -24,7 +24,6 @@ const onboardingCompleted = ref(true)
 const isLoading = ref(true)
 const loadError = ref('')
 
-const canManage = computed(() => ['super_admin', 'org_admin', 'coordinator'].includes(authState.user?.primaryRole ?? ''))
 const activeTasks = computed(() => tasks.value.filter((item) => !['completed', 'cancelled'].includes(item.status)))
 const upcomingEvents = computed(() =>
   events.value
@@ -47,21 +46,6 @@ const stats = computed(() => [
   { label: 'Подтвержденные часы', value: approvedHours.value.toFixed(1), icon: Clock3, to: '/time-entries' },
   { label: 'Новые уведомления', value: unreadNotifications.value, icon: Bell, to: '/notifications' }
 ])
-
-const quickActions = computed(() => {
-  const base = [
-    { label: 'Найти мероприятие', to: '/calendar', icon: CalendarDays },
-    { label: 'Добавить часы', to: '/time-entries', icon: Clock3 },
-    { label: 'Открыть новости', to: '/news', icon: Newspaper }
-  ]
-  if (!canManage.value) return base
-  return [
-    { label: 'Создать мероприятие', to: '/calendar', icon: Plus },
-    { label: 'Поставить задачу', to: '/tasks', icon: CheckCircle2 },
-    { label: 'Опубликовать новость', to: '/news/new', icon: FileText },
-    { label: 'Настройки', to: '/settings', icon: Settings }
-  ]
-})
 
 async function load() {
   isLoading.value = true
@@ -201,39 +185,6 @@ onMounted(load)
             </div>
           </RouterLink>
           <p v-if="news.length === 0" class="empty-state">Опубликованных новостей пока нет.</p>
-        </section>
-
-        <section class="detail-panel dashboard-widget">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Быстрый старт</p>
-              <h2>Действия</h2>
-            </div>
-          </div>
-          <div class="dashboard-action-grid">
-            <RouterLink v-for="action in quickActions" :key="action.to" class="dashboard-action" :to="action.to">
-              <component :is="action.icon" :size="18" />
-              <span>{{ action.label }}</span>
-            </RouterLink>
-          </div>
-        </section>
-
-        <section class="detail-panel dashboard-widget">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Лента</p>
-              <h2>Уведомления</h2>
-            </div>
-            <RouterLink class="secondary-action" to="/notifications">Все</RouterLink>
-          </div>
-          <RouterLink v-for="item in notifications.slice(0, 4)" :key="item.id" :class="['dashboard-row', 'compact', { unread: !item.isRead }]" :to="item.link || '/notifications'">
-            <Bell :size="18" />
-            <div>
-              <strong>{{ item.title }}</strong>
-              <small>{{ item.body }}</small>
-            </div>
-          </RouterLink>
-          <p v-if="notifications.length === 0" class="empty-state">Уведомлений пока нет.</p>
         </section>
 
         <section class="detail-panel dashboard-widget dashboard-wide-widget">

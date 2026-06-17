@@ -3,7 +3,7 @@ SET
 	first_name = 'Илья',
 	last_name = 'Морозов',
 	updated_at = now()
-WHERE email = 'volunteer1@test.local'
+WHERE email = 'admin3@puls.test'
 ;
 
 UPDATE volunteer_profiles

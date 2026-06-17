@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { Award, BriefcaseBusiness, CalendarDays, Camera, Clock3, FileCheck2, KeyRound, ListTodo, Save, Star, UserRound } from 'lucide-vue-next'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
+import { Award, BriefcaseBusiness, CalendarDays, Camera, Clock3, Coins, FileCheck2, KeyRound, ListTodo, Save, Star, UserRound } from 'lucide-vue-next'
 import { authState, changePassword, fetchCurrentUser } from '../entities/auth/store'
-import { fetchGamificationProfile } from '../entities/gamification/api'
+import { fetchGamificationProfile, fetchUserGamificationProfile } from '../entities/gamification/api'
 import { fetchVolunteer, updateVolunteer } from '../entities/users/api'
 import { fetchTasks } from '../entities/tasks/api'
 import { fetchEvents } from '../entities/events/api'
 import { fetchCertificates } from '../entities/certificates/api'
+import { fetchWallet } from '../entities/shop/api'
 import { uploadFormFile } from '../entities/forms/api'
 import { fetchProfileSchema, fetchProfileValues, saveProfileValues } from '../entities/profileFields/api'
 import type { GamificationProfile } from '../entities/gamification/types'
@@ -25,6 +27,7 @@ const tabs: { id: ProfileTab; name: string; icon: object }[] = [
   { id: 'results', name: 'Достижения и документы', icon: Award }
 ]
 const activeTab = ref<ProfileTab>('personal')
+const route = useRoute()
 const currentPassword = ref('')
 const newPassword = ref('')
 const isSubmitting = ref(false)
@@ -36,14 +39,20 @@ const volunteer = ref<VolunteerProfile | null>(null)
 const tasks = ref<TaskItem[]>([])
 const events = ref<EventItem[]>([])
 const certificates = ref<Certificate[]>([])
+const coinBalance = ref<number | null>(null)
 const groups = ref<ProfileFieldGroup[]>([])
 const customValues = ref<Record<string, ProfileValue>>({})
 const isUploadingAvatar = ref(false)
-const organizationId = computed(() => authState.user?.organizationId || authState.user?.organizations[0]?.organizationId || '')
+const profileUserId = computed(() => String(route.params.userId || authState.user?.id || ''))
+const isOwnProfile = computed(() => !route.params.userId || route.params.userId === authState.user?.id)
+const organizationId = computed(() => volunteer.value?.organizations[0]?.organizationId || authState.user?.organizationId || authState.user?.organizations[0]?.organizationId || '')
 const customGroups = computed(() => groups.value.filter((group) => group.isActive && group.fields.some((field) => !field.isSystem && field.isActive)))
 const totalApprovedHours = computed(() => gamification.value?.totalHours ?? volunteer.value?.totalHours ?? 0)
-const initials = computed(() => `${authState.user?.firstName?.[0] ?? ''}${authState.user?.lastName?.[0] ?? ''}`.toUpperCase())
-const profileAvatar = computed(() => volunteer.value?.avatarUrl || authState.user?.avatarUrl || '')
+const profileName = computed(() => volunteer.value ? `${volunteer.value.lastName} ${volunteer.value.firstName}` : `${authState.user?.lastName ?? ''} ${authState.user?.firstName ?? ''}`.trim())
+const profileEmail = computed(() => volunteer.value?.email || authState.user?.email || '')
+const profileOrganizationName = computed(() => volunteer.value?.organizations[0]?.organizationName || authState.user?.organizations[0]?.organizationName || 'Не назначена')
+const initials = computed(() => `${volunteer.value?.firstName?.[0] ?? authState.user?.firstName?.[0] ?? ''}${volunteer.value?.lastName?.[0] ?? authState.user?.lastName?.[0] ?? ''}`.toUpperCase())
+const profileAvatar = computed(() => volunteer.value?.avatarUrl || (isOwnProfile.value ? authState.user?.avatarUrl : '') || '')
 
 function openPasswordModal() {
   currentPassword.value = ''
@@ -69,6 +78,7 @@ async function submitPasswordChange() {
 async function uploadAvatar(event: Event) {
   const file = (event.target as HTMLInputElement).files?.[0]
   if (!file || !volunteer.value) return
+  if (!isOwnProfile.value) return
   isUploadingAvatar.value = true
   errorMessage.value = ''
   try {
@@ -80,7 +90,7 @@ async function uploadAvatar(event: Event) {
 }
 
 async function saveBaseProfile() {
-  if (!authState.user || !volunteer.value) return
+  if (!authState.user || !volunteer.value || !isOwnProfile.value) return
   isSubmitting.value = true
   try {
     const response = await updateVolunteer(authState.user.id, {
@@ -103,7 +113,7 @@ async function saveBaseProfile() {
 }
 
 async function saveCustomFields() {
-  if (!authState.user || !organizationId.value) return
+  if (!authState.user || !organizationId.value || !isOwnProfile.value) return
   isSubmitting.value = true
   try {
     const editable: Record<string, ProfileValue> = {}
@@ -119,16 +129,29 @@ async function saveCustomFields() {
 async function load() {
   if (!authState.user) return
   errorMessage.value = ''
+  successMessage.value = ''
+  gamification.value = null
+  volunteer.value = null
+  tasks.value = []
+  events.value = []
+  certificates.value = []
+  coinBalance.value = null
+  groups.value = []
+  customValues.value = {}
+  const userId = profileUserId.value
   const requests = [
-    fetchGamificationProfile().then((response) => { gamification.value = response.item }),
-    fetchVolunteer(authState.user.id).then((response) => { volunteer.value = response.item }),
-    fetchTasks({ assigneeId: authState.user.id }).then((response) => { tasks.value = response.items }),
+    (isOwnProfile.value ? fetchGamificationProfile() : fetchUserGamificationProfile(userId)).then((response) => { gamification.value = response.item }),
+    fetchVolunteer(userId).then((response) => { volunteer.value = response.item }),
+    fetchTasks({ assigneeId: userId }).then((response) => { tasks.value = response.items }),
     fetchEvents().then((response) => { events.value = response.items }),
-    fetchCertificates().then((response) => { certificates.value = response.items.filter((item) => item.userId === authState.user?.id) })
+    fetchCertificates().then((response) => { certificates.value = response.items.filter((item) => item.userId === userId) })
   ]
+  if (isOwnProfile.value) {
+    requests.push(fetchWallet().then((response) => { coinBalance.value = response.item.balance }))
+  }
   if (organizationId.value) {
     requests.push(fetchProfileSchema(organizationId.value).then((response) => { groups.value = response.items }))
-    requests.push(fetchProfileValues(organizationId.value, authState.user.id).then((response) => { customValues.value = response.values }))
+    requests.push(fetchProfileValues(organizationId.value, userId).then((response) => { customValues.value = response.values }))
   }
   await Promise.allSettled(requests)
 }
@@ -139,6 +162,7 @@ function fieldInputType(type: string) {
 }
 function dateText(value?: string | null) { return value ? new Date(value).toLocaleString('ru-RU') : 'Без срока' }
 onMounted(load)
+watch(() => route.params.userId, () => { void load() })
 </script>
 
 <template>
@@ -146,9 +170,9 @@ onMounted(load)
     <div class="page-heading">
       <div>
         <p class="eyebrow">Профиль волонтера</p>
-        <h1>{{ authState.user?.lastName }} {{ authState.user?.firstName }}</h1>
+        <h1>{{ profileName }}</h1>
       </div>
-      <button class="secondary-action" type="button" @click="openPasswordModal"><KeyRound :size="18" /><span>Смена пароля</span></button>
+      <button v-if="isOwnProfile" class="secondary-action" type="button" @click="openPasswordModal"><KeyRound :size="18" /><span>Смена пароля</span></button>
     </div>
 
     <nav class="profile-tabs" aria-label="Разделы профиля">
@@ -164,17 +188,18 @@ onMounted(load)
         <div class="avatar-editor">
           <img v-if="profileAvatar" :src="profileAvatar" alt="" />
           <span v-else class="avatar-fallback">{{ initials }}</span>
-          <label class="avatar-upload" title="Сменить аватар">
+          <label v-if="isOwnProfile" class="avatar-upload" title="Сменить аватар">
             <Camera :size="16" />
             <input type="file" accept="image/png,image/jpeg,image/webp,image/gif" :disabled="isUploadingAvatar" @change="uploadAvatar" />
           </label>
         </div>
-        <strong>{{ authState.user?.lastName }} {{ authState.user?.firstName }}</strong>
-        <small>{{ authState.user?.email }}</small>
+        <strong>{{ profileName }}</strong>
+        <small>{{ profileEmail }}</small>
         <dl>
-          <div><dt>Организация</dt><dd>{{ authState.user?.organizations[0]?.organizationName || 'Не назначена' }}</dd></div>
+          <div><dt>Организация</dt><dd>{{ profileOrganizationName }}</dd></div>
           <div><dt>Подтвержденные часы</dt><dd class="profile-hours"><Clock3 :size="15" />{{ totalApprovedHours.toFixed(1) }} ч.</dd></div>
           <div><dt>Баллы</dt><dd class="profile-hours"><Star :size="15" />{{ gamification?.points ?? 0 }}</dd></div>
+          <div v-if="isOwnProfile"><dt>Монеты</dt><dd class="profile-hours"><Coins :size="15" />{{ coinBalance ?? 0 }}</dd></div>
         </dl>
       </aside>
 
@@ -187,7 +212,7 @@ onMounted(load)
             <label><span>Отчество</span><input v-model="volunteer.patronymic" /></label>
             <label><span>Телефон</span><input v-model="volunteer.phone" type="tel" /></label>
             <label class="settings-form-wide"><span>Электронная почта</span><input :value="volunteer.email" disabled /></label>
-            <div class="form-actions settings-form-wide"><button class="primary-action" :disabled="isSubmitting"><Save :size="17" />Сохранить</button></div>
+            <div v-if="isOwnProfile" class="form-actions settings-form-wide"><button class="primary-action" :disabled="isSubmitting"><Save :size="17" />Сохранить</button></div>
           </form>
         </section>
 
@@ -198,7 +223,7 @@ onMounted(load)
             <label><span>Статус</span><select v-model="volunteer.status"><option value="new">Новый</option><option value="active">Активный</option><option value="unavailable">Временно недоступен</option><option value="archived">Архивный</option></select></label>
             <label class="settings-form-wide"><span>Опыт и описание</span><textarea v-model="volunteer.bio" rows="4"></textarea></label>
             <label class="settings-form-wide"><span>Интересы</span><textarea v-model="volunteer.interests" rows="3"></textarea></label>
-            <div class="form-actions settings-form-wide"><button class="primary-action" :disabled="isSubmitting"><Save :size="17" />Сохранить</button></div>
+            <div v-if="isOwnProfile" class="form-actions settings-form-wide"><button class="primary-action" :disabled="isSubmitting"><Save :size="17" />Сохранить</button></div>
           </form>
           <form v-for="group in customGroups" :key="group.id" class="profile-custom-group settings-form" @submit.prevent="saveCustomFields">
             <h3>{{ group.name }}</h3>
@@ -211,7 +236,7 @@ onMounted(load)
               <input v-else-if="field.type === 'checkbox'" v-model="customValues[field.code] as boolean" type="checkbox" :disabled="!field.editableByUser" />
               <input v-else v-model="customValues[field.code] as string" :type="fieldInputType(field.type)" :placeholder="field.placeholder" :disabled="!field.editableByUser" />
             </label>
-            <div class="form-actions"><button class="primary-action"><Save :size="17" />Сохранить дополнительные данные</button></div>
+            <div v-if="isOwnProfile" class="form-actions"><button class="primary-action"><Save :size="17" />Сохранить дополнительные данные</button></div>
           </form>
         </section>
 

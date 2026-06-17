@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Award, Clock3, FileSpreadsheet, HelpCircle, Link2, MailPlus, Pencil, Plus, Search, Trash2, Upload, UsersRound } from 'lucide-vue-next'
+import { Award, Clock3, Eye, FileSpreadsheet, HelpCircle, Link2, MailPlus, Pencil, Plus, Search, Trash2, Upload, UsersRound } from 'lucide-vue-next'
 import { createSkill, deleteSkill, fetchSkills, fetchVolunteers, updateVolunteer } from '../entities/users/api'
 import type { Skill, VolunteerProfile } from '../entities/users/types'
 import { fetchEditForm } from '../entities/forms/api'
@@ -22,6 +22,7 @@ const skillId = ref('')
 const editing = ref<VolunteerProfile | null>(null)
 const isModalOpen = ref(false)
 const isHelpOpen = ref(false)
+const isImportHelpOpen = ref(false)
 const loadError = ref('')
 const errorMessage = ref('')
 const skillName = ref('')
@@ -63,6 +64,7 @@ function closeModal() {
 
 async function load() {
   loadError.value = ''
+  page.value = 1
   try {
     const [volunteersResponse, skillsResponse, invitationsResponse] = await Promise.all([
       fetchVolunteers({ search: search.value, skillId: skillId.value }),
@@ -269,6 +271,9 @@ onMounted(load)
             <small>{{ item.email }} · {{ item.city || 'Город не указан' }}</small>
           </div>
           <div class="card-actions">
+            <RouterLink class="icon-button" :to="`/profile/${item.userId}`" aria-label="Открыть профиль">
+              <Eye :size="17" />
+            </RouterLink>
             <button class="icon-button" type="button" aria-label="Редактировать профиль" @click="openEditModal(item)">
               <Pencil :size="17" />
             </button>
@@ -340,6 +345,10 @@ onMounted(load)
             </div>
             <FileSpreadsheet :size="20" />
           </div>
+          <button class="secondary-action import-help-button" type="button" @click="isImportHelpOpen = true">
+            <HelpCircle :size="16" />
+            <span>Как подготовить файл</span>
+          </button>
           <label class="file-drop">
             <Upload :size="18" />
             <span>CSV, TSV или XLSX</span>
@@ -391,6 +400,26 @@ onMounted(load)
         </ul>
         <div class="form-actions">
           <button class="primary-action" type="button" @click="isHelpOpen = false">Понятно</button>
+        </div>
+      </article>
+    </div>
+
+    <div v-if="isImportHelpOpen" class="modal-backdrop" @click.self="isImportHelpOpen = false">
+      <article class="modal-panel detail-panel import-help-modal">
+        <h2>Файл для импорта волонтеров</h2>
+        <p class="muted-text">Поддерживаются CSV, TSV и XLSX. Первая строка должна содержать названия колонок.</p>
+        <div class="import-help-grid">
+          <strong>email</strong><span>Обязательная почта пользователя</span>
+          <strong>firstName</strong><span>Имя</span>
+          <strong>lastName</strong><span>Фамилия</span>
+          <strong>patronymic</strong><span>Отчество, можно оставить пустым</span>
+          <strong>city</strong><span>Город волонтера</span>
+          <strong>phone</strong><span>Телефон в свободном формате</span>
+          <strong>interests</strong><span>Интересы через запятую</span>
+          <strong>status</strong><span>new, active, unavailable или archived</span>
+        </div>
+        <div class="form-actions">
+          <button class="primary-action" type="button" @click="isImportHelpOpen = false">Понятно</button>
         </div>
       </article>
     </div>

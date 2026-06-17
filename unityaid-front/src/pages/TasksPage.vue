@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { Eye, Pencil, Plus, Trash2 } from 'lucide-vue-next'
-import { createTask, deleteTask, fetchTasks, updateTask } from '../entities/tasks/api'
+import { addTaskAttachment, createTask, deleteTask, fetchTasks, updateTask } from '../entities/tasks/api'
 import type { TaskItem, TaskPayload } from '../entities/tasks/types'
 import { fetchCreateForm, fetchEditForm } from '../entities/forms/api'
 import type { BackendForm, FormModel } from '../entities/forms/types'
@@ -20,6 +20,7 @@ const statusFilter = ref('')
 const priorityFilter = ref('')
 const formSchema = ref<BackendForm | null>(null)
 const formModel = ref<FormModel>({})
+const attachmentDraft = ref({ fileName: '', fileUrl: '' })
 const { page, perPage, pageItems } = useClientPagination(items, 12)
 
 const statusOptions = [
@@ -41,6 +42,7 @@ function resetForm() {
   editingId.value = null
   formSchema.value = null
   formModel.value = {}
+  attachmentDraft.value = { fileName: '', fileUrl: '' }
   errorMessage.value = ''
 }
 
@@ -76,14 +78,24 @@ function payload(): TaskPayload {
 }
 
 async function load() {
+  page.value = 1
   items.value = (await fetchTasks({ status: statusFilter.value, priority: priorityFilter.value })).items
 }
 
 async function submit() {
   errorMessage.value = ''
   try {
-    if (editingId.value) await updateTask(editingId.value, payload())
-    else await createTask(payload())
+    if (editingId.value) {
+      await updateTask(editingId.value, payload())
+      if (attachmentDraft.value.fileName.trim() && attachmentDraft.value.fileUrl.trim()) {
+        await addTaskAttachment(editingId.value, {
+          fileName: attachmentDraft.value.fileName.trim(),
+          fileUrl: attachmentDraft.value.fileUrl.trim()
+        })
+      }
+    } else {
+      await createTask(payload())
+    }
     closeModal()
     await load()
   } catch (error) {
@@ -143,9 +155,14 @@ onMounted(load)
 
     <div v-if="isModalOpen" class="modal-backdrop" @click.self="closeModal">
       <form class="modal-panel entity-form" @submit.prevent="submit">
-        <h2>{{ formSchema?.meta.title || (editingId ? 'Редактирование задачи' : 'Новая задача') }}</h2>
+        <h2>{{ formSchema?.meta.title || (editingId ? 'Редактирование задачи' : 'Создание задачи') }}</h2>
         <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
         <DynamicForm v-if="formSchema" v-model="formModel" :form="formSchema" />
+        <fieldset v-if="editingId" class="settings-form task-edit-attachments">
+          <legend>Вложение</legend>
+          <input v-model="attachmentDraft.fileName" placeholder="Название файла" />
+          <input v-model="attachmentDraft.fileUrl" placeholder="URL файла" />
+        </fieldset>
         <div class="form-actions">
           <button class="secondary-action" type="button" @click="closeModal">Отмена</button>
           <button class="primary-action" type="submit">Сохранить</button>

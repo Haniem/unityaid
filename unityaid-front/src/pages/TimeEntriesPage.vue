@@ -8,7 +8,10 @@ import { fetchTasks } from '../entities/tasks/api'
 import type { TaskItem } from '../entities/tasks/types'
 import { approveTimeEntry, bulkApproveTimeEntries, createTimeEntry, fetchTimeEntries, rejectTimeEntry } from '../entities/timeentries/api'
 import type { TimeEntry, TimeEntryStatus } from '../entities/timeentries/types'
+import { fetchVolunteers } from '../entities/users/api'
+import type { PossibleValue } from '../entities/forms/types'
 import { formatDateTime } from '../shared/date'
+import AsyncSelect from '../shared/ui/AsyncSelect.vue'
 import CustomSelect from '../shared/ui/CustomSelect.vue'
 import PaginationBar from '../shared/ui/PaginationBar.vue'
 import { useClientPagination } from '../shared/pagination'
@@ -17,6 +20,7 @@ const items = ref<TimeEntry[]>([])
 const events = ref<EventItem[]>([])
 const tasks = ref<TaskItem[]>([])
 const statusFilter = ref('')
+const userFilter = ref('')
 const errorMessage = ref('')
 const successMessage = ref('')
 const form = reactive({ targetType: 'event' as 'event' | 'task', targetId: '', hours: '', description: '' })
@@ -50,7 +54,7 @@ async function load() {
   errorMessage.value = ''
   try {
     const [entriesResponse, eventsResponse, tasksResponse] = await Promise.all([
-      fetchTimeEntries({ status: statusFilter.value }),
+      fetchTimeEntries({ status: statusFilter.value, userId: userFilter.value }),
       fetchEvents(),
       fetchTasks()
     ])
@@ -61,6 +65,14 @@ async function load() {
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить учет времени'
   }
+}
+
+async function loadUserOptions(params: { search: string; page: number; perPage: number }) {
+  const response = await fetchVolunteers({ search: params.search })
+  const items: PossibleValue[] = response.items
+    .slice((params.page - 1) * params.perPage, params.page * params.perPage)
+    .map((user) => ({ id: user.userId, name: `${user.lastName} ${user.firstName} · ${user.email}` }))
+  return { items }
 }
 
 function updateDefaultTarget() {
@@ -198,6 +210,10 @@ onMounted(load)
             <label class="filter-select compact-filter">
               <span>Статус</span>
               <CustomSelect v-model="statusFilter" :options="timeStatusOptions" @update:model-value="load" />
+            </label>
+            <label class="filter-select compact-filter time-user-filter">
+              <span>????????????</span>
+              <AsyncSelect v-model="userFilter" :load-options="loadUserOptions" placeholder="??? ????????????" @update:model-value="load" />
             </label>
           </div>
 

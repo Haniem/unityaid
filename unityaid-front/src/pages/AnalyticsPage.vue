@@ -34,6 +34,27 @@ const to = ref('')
 const savedFilterName = ref('')
 const savedFilters = ref<Array<{ name: string; from: string; to: string }>>([])
 
+const chartLabelMap: Record<string, string> = {
+  created: 'Создана',
+  assigned: 'Назначена',
+  in_progress: 'В работе',
+  review: 'На проверке',
+  completed: 'Выполнена',
+  low: 'Низкий',
+  medium: 'Средний',
+  high: 'Высокий',
+  draft: 'Черновик',
+  published: 'Опубликовано',
+  cancelled: 'Отменено',
+  completed_event: 'Завершено',
+  online: 'Онлайн',
+  offline: 'Очно',
+  hybrid: 'Гибрид',
+  pending: 'На проверке',
+  approved: 'Подтверждено',
+  rejected: 'Отклонено'
+}
+
 const reports = [
   { code: 'overview', title: 'Обзор', description: 'Ключевые показатели, заявки, посещаемость и топ волонтеров.', icon: BarChart3, to: '/analytics/overview' },
   { code: 'volunteers', title: 'Волонтеры', description: 'Статусы, уровни, часы и лидеры волонтерской активности.', icon: UsersRound, to: '/analytics/volunteers' },
@@ -44,7 +65,7 @@ const reports = [
 ]
 
 const managementReports = [
-  { code: 'executive', title: 'Executive dashboard', description: 'Сводка для руководителя по ключевым показателям и рискам.', icon: BarChart3, to: '/analytics/executive' },
+  { code: 'executive', title: '?????? ????????????', description: 'Сводка для руководителя по ключевым показателям и рискам.', icon: BarChart3, to: '/analytics/executive' },
   { code: 'management', title: 'Для руководства', description: 'Динамика заявок и операционные показатели периода.', icon: ClipboardList, to: '/analytics/management' },
   { code: 'grant', title: 'Для грантодателя', description: 'Подтвержденные часы и вклад организаций.', icon: Award, to: '/analytics/grant' },
   { code: 'branches', title: 'Филиалы', description: 'Активность филиалов, мероприятий и задач.', icon: CalendarDays, to: '/analytics/branches' },
@@ -177,6 +198,10 @@ function barWidth(items: ChartPoint[], value: number) {
   return `${Math.max(4, (value / max) * 100)}%`
 }
 
+function chartLabel(value: string) {
+  return chartLabelMap[value] || value
+}
+
 function formatDateTime(value: string) {
   if (!value) return ''
   return new Date(value).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' })
@@ -302,7 +327,7 @@ onMounted(() => {
             </div>
             <div class="bar-chart">
               <div v-for="point in section.items" :key="point.label" class="bar-row">
-                <span>{{ point.label }}</span>
+                <span>{{ chartLabel(point.label) }}</span>
                 <div><i :style="{ width: barWidth(section.items, point.value) }"></i></div>
                 <strong>{{ point.value }}</strong>
               </div>
@@ -319,7 +344,7 @@ onMounted(() => {
             </div>
           </div>
           <article v-for="volunteer in topVolunteers" :key="volunteer.userId" class="analytics-table-row">
-            <strong>{{ volunteer.userName }}</strong>
+            <RouterLink class="table-link" :to="`/profile/${volunteer.userId}`">{{ volunteer.userName }}</RouterLink>
             <span>{{ volunteer.email }}</span>
             <span>{{ volunteer.totalHours.toFixed(1) }} ч.</span>
             <span>{{ volunteer.points }} баллов</span>

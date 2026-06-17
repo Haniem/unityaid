@@ -2,64 +2,103 @@ package certificates
 
 import (
 	"bytes"
+	_ "embed"
 	"fmt"
 	"strings"
-	"time"
+
+	"github.com/jung-kurt/gofpdf"
 )
 
+//go:embed assets/DejaVuSans.ttf
+var regularFont []byte
+
+//go:embed assets/DejaVuSans-Bold.ttf
+var boldFont []byte
+
 func BuildPDF(item Certificate) []byte {
-	lines := []string{
-		"Пульс",
-		item.Title,
-		"Recipient: " + item.UserName,
-		fmt.Sprintf("Approved volunteer hours: %.1f", item.TotalHours),
-		"Issued at: " + item.IssuedAt.Format("02.01.2006"),
-		"Verification code: " + item.VerifyCode,
-		"Проверить код можно в системе Пульс.",
-	}
-	if item.OrganizationName != nil {
-		lines = append(lines[:3], append([]string{"Organization: " + *item.OrganizationName}, lines[3:]...)...)
-	}
-	if item.Description != "" {
-		lines = append(lines[:2], append([]string{item.Description}, lines[2:]...)...)
+	pdf := gofpdf.New("P", "mm", "A4", "")
+	pdf.SetMargins(18, 18, 18)
+	pdf.SetAutoPageBreak(true, 18)
+	pdf.AddUTF8FontFromBytes("DejaVu", "", regularFont)
+	pdf.AddUTF8FontFromBytes("DejaVu", "B", boldFont)
+	pdf.AddPage()
+
+	pdf.SetFillColor(47, 160, 111)
+	pdf.Rect(0, 0, 210, 42, "F")
+	pdf.SetTextColor(255, 255, 255)
+	pdf.SetFont("DejaVu", "B", 22)
+	pdf.SetXY(18, 14)
+	pdf.CellFormat(0, 9, "Пульс Добра", "", 1, "L", false, 0, "")
+	pdf.SetFont("DejaVu", "", 10)
+	pdf.SetX(18)
+	pdf.CellFormat(0, 6, "Сертификат волонтерской активности", "", 1, "L", false, 0, "")
+
+	pdf.SetTextColor(22, 33, 58)
+	pdf.SetY(58)
+	pdf.SetFont("DejaVu", "B", 24)
+	pdf.MultiCell(174, 10, clean(item.Title), "", "L", false)
+
+	if strings.TrimSpace(item.Description) != "" {
+		pdf.Ln(4)
+		pdf.SetFont("DejaVu", "", 11)
+		pdf.SetTextColor(83, 96, 121)
+		pdf.MultiCell(174, 7, clean(item.Description), "", "L", false)
 	}
 
-	var content strings.Builder
-	content.WriteString("BT\n/F1 24 Tf\n72 760 Td\n(Пульс - сертификат) Tj\n")
-	content.WriteString("/F1 13 Tf\n0 -42 Td\n")
-	for _, line := range lines {
-		content.WriteString("(" + pdfEscape(line) + ") Tj\n0 -24 Td\n")
+	pdf.Ln(8)
+	drawInfoCard(pdf, "Получатель", item.UserName)
+	if item.OrganizationName != nil && strings.TrimSpace(*item.OrganizationName) != "" {
+		drawInfoCard(pdf, "Организация", *item.OrganizationName)
 	}
-	content.WriteString("ET\n")
+	drawInfoCard(pdf, "Подтвержденные часы", fmt.Sprintf("%.1f ч.", item.TotalHours))
+	drawInfoCard(pdf, "Дата выдачи", item.IssuedAt.Format("02.01.2006"))
 
-	stream := content.String()
-	objects := []string{
-		"<< /Type /Catalog /Pages 2 0 R >>",
-		"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-		"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
-		"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
-		fmt.Sprintf("<< /Length %d >>\nstream\n%s\nendstream", len(stream), stream),
-	}
+	pdf.Ln(6)
+	pdf.SetFillColor(244, 248, 246)
+	pdf.SetDrawColor(217, 229, 224)
+	pdf.RoundedRect(18, pdf.GetY(), 174, 30, 3, "1234", "FD")
+	pdf.SetXY(24, pdf.GetY()+6)
+	pdf.SetFont("DejaVu", "", 9)
+	pdf.SetTextColor(83, 96, 121)
+	pdf.CellFormat(0, 5, "Код проверки", "", 1, "L", false, 0, "")
+	pdf.SetX(24)
+	pdf.SetFont("DejaVu", "B", 16)
+	pdf.SetTextColor(22, 33, 58)
+	pdf.CellFormat(0, 8, item.VerifyCode, "", 1, "L", false, 0, "")
 
-	var out bytes.Buffer
-	out.WriteString("%PDF-1.4\n")
-	offsets := []int{0}
-	for i, obj := range objects {
-		offsets = append(offsets, out.Len())
-		out.WriteString(fmt.Sprintf("%d 0 obj\n%s\nendobj\n", i+1, obj))
+	pdf.SetY(255)
+	pdf.SetDrawColor(217, 229, 224)
+	pdf.Line(18, 252, 192, 252)
+	pdf.SetFont("DejaVu", "", 9)
+	pdf.SetTextColor(100, 112, 138)
+	pdf.MultiCell(174, 5, "Проверить подлинность сертификата можно в системе Пульс по коду проверки. Документ сформирован автоматически.", "", "L", false)
+
+	var buffer bytes.Buffer
+	if err := pdf.Output(&buffer); err != nil {
+		return nil
 	}
-	xref := out.Len()
-	out.WriteString(fmt.Sprintf("xref\n0 %d\n0000000000 65535 f \n", len(objects)+1))
-	for i := 1; i < len(offsets); i++ {
-		out.WriteString(fmt.Sprintf("%010d 00000 n \n", offsets[i]))
-	}
-	out.WriteString(fmt.Sprintf("trailer\n<< /Size %d /Root 1 0 R /Info << /CreationDate (D:%s) >> >>\nstartxref\n%d\n%%%%EOF", len(objects)+1, time.Now().Format("20060102150405"), xref))
-	return out.Bytes()
+	return buffer.Bytes()
 }
 
-func pdfEscape(value string) string {
-	value = strings.ReplaceAll(value, `\`, `\\`)
-	value = strings.ReplaceAll(value, "(", `\(`)
-	value = strings.ReplaceAll(value, ")", `\)`)
+func drawInfoCard(pdf *gofpdf.Fpdf, label string, value string) {
+	y := pdf.GetY()
+	pdf.SetFillColor(255, 255, 255)
+	pdf.SetDrawColor(226, 232, 240)
+	pdf.RoundedRect(18, y, 174, 20, 3, "1234", "FD")
+	pdf.SetXY(24, y+4)
+	pdf.SetFont("DejaVu", "", 8.5)
+	pdf.SetTextColor(100, 112, 138)
+	pdf.CellFormat(54, 5, label, "", 0, "L", false, 0, "")
+	pdf.SetFont("DejaVu", "B", 11)
+	pdf.SetTextColor(22, 33, 58)
+	pdf.MultiCell(110, 5, clean(value), "", "L", false)
+	pdf.SetY(y + 24)
+}
+
+func clean(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "Не указано"
+	}
 	return value
 }

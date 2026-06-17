@@ -16,6 +16,7 @@ import KnowledgeBasePage from '../pages/KnowledgeBasePage.vue'
 import KnowledgeFormPage from '../pages/KnowledgeFormPage.vue'
 import TasksPage from '../pages/TasksPage.vue'
 import EventDetailPage from '../pages/EventDetailPage.vue'
+import FaqPage from '../pages/FaqPage.vue'
 import AchievementsPage from '../pages/AchievementsPage.vue'
 import AnalyticsPage from '../pages/AnalyticsPage.vue'
 import AdminPanelPage from '../pages/AdminPanelPage.vue'
@@ -27,6 +28,7 @@ import TimeEntriesPage from '../pages/TimeEntriesPage.vue'
 import VolunteersPage from '../pages/VolunteersPage.vue'
 import SettingsPage from '../pages/SettingsPage.vue'
 import ProfileFieldsSettingsPage from '../pages/ProfileFieldsSettingsPage.vue'
+import ShopPage from '../pages/ShopPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -52,9 +54,20 @@ export const router = createRouter({
           component: ProfilePage
         },
         {
+          path: 'profile/:userId',
+          name: 'profile-user',
+          component: ProfilePage
+        },
+        {
+          path: 'faq',
+          name: 'faq',
+          component: FaqPage
+        },
+        {
           path: 'onboarding',
           name: 'onboarding',
-          component: OnboardingPage
+          component: OnboardingPage,
+          meta: { roles: ['super_admin', 'org_admin'] }
         },
         {
           path: 'settings',
@@ -138,6 +151,11 @@ export const router = createRouter({
           component: AchievementsPage
         },
         {
+          path: 'shop',
+          name: 'shop',
+          component: ShopPage
+        },
+        {
           path: 'certificates',
           name: 'certificates',
           component: CertificatesPage
@@ -215,6 +233,11 @@ router.beforeEach(async (to) => {
 
   if (!to.meta.public && !authState.user) {
     return { name: 'login', query: { redirect: to.fullPath } }
+  }
+
+  const roles = to.meta.roles as string[] | undefined
+  if (roles?.length && !roles.includes(authState.user?.primaryRole ?? '')) {
+    return { name: 'dashboard' }
   }
 
   if (to.name === 'login' && authState.user) {

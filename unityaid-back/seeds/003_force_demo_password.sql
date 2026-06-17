@@ -7,11 +7,7 @@ SET
 	updated_at = now()
 WHERE email IN (
 	'admin@puls.test',
-	'org.admin@dobrye-ruki.test',
-	'coord@dobrye-ruki.test',
-	'volunteer1@test.local',
-	'volunteer2@test.local',
-	'org.admin@ecopulse.test',
-	'coord@ecopulse.test',
-	'volunteer3@test.local'
+	'admin1@puls.test',
+	'admin2@puls.test',
+	'admin3@puls.test'
 );

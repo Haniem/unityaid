@@ -26,6 +26,19 @@ const recurringFrequency = ref('weekly')
 const recurringCount = ref(1)
 const { page, perPage, pageItems } = useClientPagination(items, 10)
 
+const statusLabels: Record<string, string> = {
+  draft: 'Черновик',
+  published: 'Опубликовано',
+  cancelled: 'Отменено',
+  completed: 'Завершено'
+}
+
+const formatLabels: Record<string, string> = {
+  online: 'Онлайн',
+  offline: 'Очно',
+  hybrid: 'Гибрид'
+}
+
 function resetForm() {
   editingId.value = null
   formSchema.value = null
@@ -143,12 +156,12 @@ onMounted(load)
     <div class="event-list">
       <article v-for="item in pageItems" :key="item.id" class="event-card">
         <RouterLink class="event-card-main" :to="`/calendar/${item.id}`">
-          <span class="status-pill">{{ item.status }}</span>
+          <span class="status-pill">{{ statusLabels[item.status] || item.status }}</span>
           <h2>{{ item.title }}</h2>
           <p>{{ item.description || 'Описание пока не заполнено.' }}</p>
           <div class="meta-line">
             <MapPin :size="16" />
-            <span>{{ item.location || item.format }} · {{ formatDateTime(item.startsAt) }}</span>
+            <span>{{ item.location || formatLabels[item.format] || item.format }} · {{ formatDateTime(item.startsAt) }}</span>
           </div>
           <small>{{ item.organizationName }} · лимит {{ item.maxParticipants || 'не указан' }}</small>
         </RouterLink>
@@ -163,7 +176,7 @@ onMounted(load)
 
     <div v-if="isModalOpen" class="modal-backdrop" @click.self="closeModal">
       <form class="modal-panel entity-form" @submit.prevent="submit">
-        <h2>{{ formSchema?.meta.title || (editingId ? 'Редактирование мероприятия' : 'Новое мероприятие') }}</h2>
+        <h2>{{ formSchema?.meta.title || (editingId ? 'Редактирование мероприятия' : 'Создание мероприятия') }}</h2>
         <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
         <DynamicForm v-if="formSchema" v-model="formModel" :form="formSchema" />
         <div v-if="!editingId" class="event-planning-tools">

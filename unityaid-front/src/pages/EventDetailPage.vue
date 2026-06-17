@@ -42,6 +42,7 @@ const bulkRejectionReason = ref('')
 const bulkAttendanceHours = ref('')
 const errorMessage = ref('')
 const successMessage = ref('')
+const activeTab = ref<'participants' | 'applications' | 'feedback'>('participants')
 
 const applicationMessage = ref('')
 const attendanceForm = reactive({ userId: '', hours: '' })
@@ -49,6 +50,7 @@ const shiftForm = reactive({ title: '', startsAt: '', endsAt: '', capacity: '' }
 const feedbackForm = reactive({ rating: 5, comment: '' })
 const { page: applicationsPage, perPage: applicationsPerPage, pageItems: applicationsPageItems } = useClientPagination(applications, 8)
 const { page: attendancePage, perPage: attendancePerPage, pageItems: attendancePageItems } = useClientPagination(attendance, 8)
+
 const applicationStatusOptions = [
   { id: 'pending', name: 'На рассмотрении' },
   { id: 'approved', name: 'Подтверждена' },
@@ -74,6 +76,7 @@ const pendingApplications = computed(() => applications.value.filter((app) => ap
 const approvedParticipantOptions = computed(() => approvedParticipants.value.map((app) => ({ id: app.userId, name: app.userName })))
 const myFeedback = computed(() => feedback.value.find((entry) => entry.userId === currentUserId.value))
 const canLeaveFeedback = computed(() => item.value?.status === 'completed' && !canManageEvent.value)
+
 const coordinatorStats = computed(() => [
   { label: 'Заявки', value: applications.value.length },
   { label: 'Ожидают', value: pendingApplications.value.length },
@@ -89,6 +92,19 @@ const applicationStatusLabels: Record<EventApplication['status'], string> = {
   cancelled: 'Отменена'
 }
 
+const eventStatusLabels: Record<string, string> = {
+  draft: 'Черновик',
+  published: 'Опубликовано',
+  completed: 'Завершено',
+  cancelled: 'Отменено'
+}
+
+const eventFormatLabels: Record<string, string> = {
+  online: 'Онлайн',
+  offline: 'Очно',
+  hybrid: 'Гибрид'
+}
+
 async function loadFeedback() {
   const response = await fetchEventFeedback(eventId)
   feedback.value = response.items
@@ -100,10 +116,7 @@ async function load() {
   try {
     errorMessage.value = ''
     item.value = (await fetchEvent(eventId)).item
-    const [appsResponse, shiftsResponse] = await Promise.all([
-      fetchEventApplications(eventId),
-      fetchEventShifts(eventId)
-    ])
+    const [appsResponse, shiftsResponse] = await Promise.all([fetchEventApplications(eventId), fetchEventShifts(eventId)])
     applications.value = appsResponse.items
     shifts.value = shiftsResponse.items
     await loadFeedback()
@@ -138,7 +151,7 @@ async function cancelApplication() {
 
 async function setApplicationStatus(app: EventApplication, status: EventApplication['status']) {
   const response = await updateEventApplication(eventId, app.id, status)
-  const index = applications.value.findIndex((item) => item.id === app.id)
+  const index = applications.value.findIndex((entry) => entry.id === app.id)
   if (index >= 0) applications.value[index] = response.item
 }
 
@@ -155,7 +168,7 @@ async function bulkSetApplicationStatus(status: EventApplication['status']) {
   }
   selectedApplicationIds.value = []
   bulkRejectionReason.value = ''
-  successMessage.value = status === 'approved' ? 'Заявки подтверждены' : 'Заявки отклонены'
+  successMessage.value = status === 'approved' ? 'Выбранные заявки подтверждены' : 'Выбранные заявки отклонены'
 }
 
 async function markAttendance() {
@@ -175,7 +188,7 @@ async function markAttendance() {
 async function saveAttendance(row: EventAttendance) {
   const hours = Number(attendanceHours.value[row.id] || row.hours)
   const response = await updateEventAttendance(eventId, row.id, { hours })
-  const index = attendance.value.findIndex((item) => item.id === row.id)
+  const index = attendance.value.findIndex((entry) => entry.id === row.id)
   if (index >= 0) attendance.value[index] = response.item
 }
 
@@ -189,7 +202,7 @@ async function markSelectedAttendance() {
   attendanceHours.value = Object.fromEntries(response.items.map((row) => [row.id, String(row.hours)]))
   selectedAttendanceUserIds.value = []
   bulkAttendanceHours.value = ''
-  successMessage.value = 'Посещаемость отмечена'
+  successMessage.value = 'Посещаемость выбранных участников отмечена'
 }
 
 async function addShift() {
@@ -230,7 +243,7 @@ onMounted(load)
 <template>
   <section class="page-section">
     <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
-    <article v-else-if="item" class="detail-layout wide">
+    <article v-else-if="item" class="detail-layout wide event-detail-page">
       <div class="page-heading">
         <div>
           <p class="eyebrow">{{ item.organizationName }}</p>
@@ -239,17 +252,17 @@ onMounted(load)
         <RouterLink class="secondary-action" to="/calendar">К списку</RouterLink>
       </div>
 
-      <div class="detail-panel">
-        <span class="status-pill">{{ item.status }} · {{ item.format }}</span>
+      <div class="detail-panel event-hero-panel">
+        <span class="status-pill">{{ eventStatusLabels[item.status] || item.status }} · {{ eventFormatLabels[item.format] || item.format }}</span>
         <p class="detail-summary">{{ item.description || 'Описание мероприятия пока не заполнено.' }}</p>
         <div class="detail-metrics">
           <div><CalendarDays :size="18" /><span>{{ formatDateTime(item.startsAt) }} - {{ formatDateTime(item.endsAt) }}</span></div>
           <div><MapPin :size="18" /><span>{{ item.location || 'Место не указано' }}</span></div>
           <div><Users :size="18" /><span>Лимит: {{ item.maxParticipants || 'не указан' }}</span></div>
           <div v-if="canManageEvent"><QrCode :size="18" /><span>Код отметки: {{ item.checkinCode }}</span></div>
-          <div><Star :size="18" /><span>Средняя оценка: {{ feedbackCount ? feedbackAverage.toFixed(1) : 'нет отзывов' }}</span></div>
+          <div><Star :size="18" /><span>Оценка: {{ feedbackCount ? feedbackAverage.toFixed(1) : 'нет отзывов' }}</span></div>
         </div>
-        <button v-if="canManageEvent && item.status !== 'completed'" class="primary-action" type="button" @click="finishEvent">
+        <button v-if="canManageEvent && item.status !== 'completed'" class="primary-action event-complete-action" type="button" @click="finishEvent">
           <CheckCircle2 :size="17" /> Завершить и начислить часы
         </button>
       </div>
@@ -257,7 +270,7 @@ onMounted(load)
       <section v-if="canManageEvent" class="detail-panel coordinator-console">
         <div class="section-heading">
           <div>
-            <p class="eyebrow">Рабочий экран координатора</p>
+            <p class="eyebrow">Координатор</p>
             <h2>Оперативное управление</h2>
           </div>
         </div>
@@ -267,25 +280,52 @@ onMounted(load)
             <span>{{ stat.label }}: {{ stat.value }}</span>
           </div>
         </div>
-        <div class="bulk-toolbar">
-          <button class="secondary-action" type="button" :disabled="selectedApplicationIds.length === 0" @click="bulkSetApplicationStatus('approved')">
-            Подтвердить выбранные
-          </button>
-          <input v-model="bulkRejectionReason" placeholder="Причина отклонения" />
-          <button class="secondary-action danger-action" type="button" :disabled="selectedApplicationIds.length === 0" @click="bulkSetApplicationStatus('rejected')">
-            Отклонить выбранные
-          </button>
-          <input v-model="bulkAttendanceHours" type="number" min="0" step="0.25" placeholder="часы" />
-          <button class="primary-action" type="button" :disabled="selectedAttendanceUserIds.length === 0" @click="markSelectedAttendance">
-            Отметить посещаемость
-          </button>
-        </div>
       </section>
 
-      <div class="management-grid">
-        <section class="detail-panel">
-          <p class="eyebrow">Участие</p>
-          <form v-if="!myApplication" class="settings-form" @submit.prevent="applyToEvent">
+      <section class="detail-panel event-workspace">
+        <div class="tabs">
+          <button :class="{ active: activeTab === 'participants' }" type="button" @click="activeTab = 'participants'">Участники</button>
+          <button :class="{ active: activeTab === 'applications' }" type="button" @click="activeTab = 'applications'">Заявки</button>
+          <button :class="{ active: activeTab === 'feedback' }" type="button" @click="activeTab = 'feedback'">Отзывы</button>
+        </div>
+
+        <div v-if="activeTab === 'participants'" class="tab-panel">
+          <div v-if="canManageEvent" class="context-toolbar">
+            <input v-model="bulkAttendanceHours" type="number" min="0" step="0.25" placeholder="Часы для выбранных" />
+            <button class="primary-action" type="button" :disabled="selectedAttendanceUserIds.length === 0" @click="markSelectedAttendance">
+              Отметить выбранных
+            </button>
+          </div>
+          <article v-for="app in approvedParticipants" :key="app.id" class="member-row application-row">
+            <input v-if="canManageEvent" v-model="selectedAttendanceUserIds" type="checkbox" :value="app.userId" aria-label="Выбрать участника" />
+            <div>
+              <strong>{{ app.userName }}</strong>
+              <small>{{ app.email }}</small>
+            </div>
+            <span class="status-pill">Подтвержден</span>
+          </article>
+          <p v-if="approvedParticipants.length === 0" class="empty-state">Подтвержденных участников пока нет.</p>
+
+          <template v-if="canManageEvent">
+            <form class="inline-member-form attendance-form" @submit.prevent="markAttendance">
+              <CustomSelect v-model="attendanceForm.userId" :options="approvedParticipantOptions" placeholder="Участник" />
+              <input v-model="attendanceForm.hours" type="number" step="0.25" min="0" placeholder="часы" />
+              <button class="primary-action" type="submit"><Clock3 :size="17" /> Отметить</button>
+            </form>
+            <article v-for="row in attendancePageItems" :key="row.id" class="member-row attendance-row">
+              <div>
+                <strong>{{ row.userName }}</strong>
+                <small>{{ row.email }}</small>
+              </div>
+              <input v-model="attendanceHours[row.id]" type="number" min="0" step="0.25" />
+              <button class="secondary-action" type="button" @click="saveAttendance(row)">Сохранить часы</button>
+            </article>
+            <PaginationBar v-model:page="attendancePage" :per-page="attendancePerPage" :total="attendance.length" />
+          </template>
+        </div>
+
+        <div v-if="activeTab === 'applications'" class="tab-panel">
+          <form v-if="!myApplication" class="settings-form application-form" @submit.prevent="applyToEvent">
             <textarea v-model="applicationMessage" rows="3" placeholder="Комментарий к заявке" />
             <button class="primary-action" type="submit">Подать заявку</button>
           </form>
@@ -294,88 +334,43 @@ onMounted(load)
               <strong>Моя заявка</strong>
               <small>{{ applicationStatusLabels[myApplication.status] }}</small>
             </div>
-            <span class="status-pill">{{ myApplication.status }}</span>
-            <button class="secondary-action danger-action" type="button" @click="cancelApplication">Отменить</button>
+            <button class="secondary-action danger-action" type="button" @click="cancelApplication">Отменить заявку</button>
           </div>
           <p v-if="successMessage" class="form-success">{{ successMessage }}</p>
-        </section>
 
-        <section v-if="canManageEvent" class="detail-panel">
-          <p class="eyebrow">Заявки координатора</p>
+          <div v-if="canManageEvent" class="context-toolbar">
+            <button class="secondary-action" type="button" :disabled="selectedApplicationIds.length === 0" @click="bulkSetApplicationStatus('approved')">
+              Подтвердить выбранные заявки
+            </button>
+            <input v-model="bulkRejectionReason" placeholder="Причина отклонения" />
+            <button class="secondary-action danger-action" type="button" :disabled="selectedApplicationIds.length === 0" @click="bulkSetApplicationStatus('rejected')">
+              Отклонить выбранные заявки
+            </button>
+          </div>
           <article v-for="app in applicationsPageItems" :key="app.id" class="member-row application-row">
-            <input v-model="selectedApplicationIds" type="checkbox" :value="app.id" aria-label="Выбрать заявку" />
+            <input v-if="canManageEvent" v-model="selectedApplicationIds" type="checkbox" :value="app.id" aria-label="Выбрать заявку" />
             <div>
               <strong>{{ app.userName }}</strong>
               <small>{{ app.email }} · {{ app.message || 'без комментария' }}</small>
               <small v-if="app.rejectionReason">Причина: {{ app.rejectionReason }}</small>
             </div>
             <span class="status-pill">{{ applicationStatusLabels[app.status] }}</span>
-            <CustomSelect :model-value="app.status" :options="applicationStatusOptions" @update:model-value="setApplicationStatus(app, $event as EventApplication['status'])" />
+            <CustomSelect v-if="canManageEvent" :model-value="app.status" :options="applicationStatusOptions" @update:model-value="setApplicationStatus(app, $event as EventApplication['status'])" />
           </article>
           <PaginationBar v-model:page="applicationsPage" :per-page="applicationsPerPage" :total="applications.length" />
           <p v-if="applications.length === 0" class="empty-state">Заявок пока нет.</p>
-        </section>
+        </div>
 
-        <section v-if="canManageEvent" class="detail-panel">
-          <p class="eyebrow">Участники</p>
-          <article v-for="app in approvedParticipants" :key="app.id" class="member-row application-row">
-            <input v-model="selectedAttendanceUserIds" type="checkbox" :value="app.userId" aria-label="Выбрать участника" />
-            <div>
-              <strong>{{ app.userName }}</strong>
-              <small>{{ app.email }}</small>
-            </div>
-            <span class="status-pill">подтвержден</span>
-          </article>
-          <p v-if="approvedParticipants.length === 0" class="empty-state">Подтвержденных участников пока нет.</p>
-        </section>
-
-        <section v-if="canManageEvent" class="detail-panel">
-          <p class="eyebrow">Посещаемость</p>
-          <form class="inline-member-form attendance-form" @submit.prevent="markAttendance">
-            <CustomSelect v-model="attendanceForm.userId" :options="approvedParticipantOptions" placeholder="Участник" />
-            <input v-model="attendanceForm.hours" type="number" step="0.25" min="0" placeholder="часы" />
-            <button class="primary-action" type="submit"><Clock3 :size="17" /> Отметить</button>
-          </form>
-          <article v-for="row in attendancePageItems" :key="row.id" class="member-row attendance-row">
-            <div>
-              <strong>{{ row.userName }}</strong>
-              <small>{{ row.email }}</small>
-            </div>
-            <input v-model="attendanceHours[row.id]" type="number" min="0" step="0.25" />
-            <button class="secondary-action" type="button" @click="saveAttendance(row)">Сохранить</button>
-          </article>
-          <PaginationBar v-model:page="attendancePage" :per-page="attendancePerPage" :total="attendance.length" />
-        </section>
-
-        <section v-if="canManageEvent" class="detail-panel">
-          <p class="eyebrow">Смены</p>
-          <form class="settings-form" @submit.prevent="addShift">
-            <input v-model="shiftForm.title" placeholder="Название смены" required />
-            <input v-model="shiftForm.startsAt" type="datetime-local" required />
-            <input v-model="shiftForm.endsAt" type="datetime-local" required />
-            <input v-model="shiftForm.capacity" type="number" min="1" placeholder="лимит" />
-            <button class="primary-action" type="submit">Добавить смену</button>
-          </form>
-          <p v-for="shift in shifts" :key="shift.id">{{ shift.title }} · {{ formatDateTime(shift.startsAt) }}</p>
-        </section>
-
-        <section class="detail-panel feedback-panel">
+        <div v-if="activeTab === 'feedback'" class="tab-panel">
           <div class="section-heading">
             <div>
               <p class="eyebrow">Обратная связь</p>
               <h2>{{ feedbackCount ? `${feedbackAverage.toFixed(1)} / 5` : 'Пока нет оценок' }}</h2>
             </div>
           </div>
-
           <form v-if="canLeaveFeedback" class="settings-form" @submit.prevent="sendFeedback">
             <div class="rating-control" role="radiogroup" aria-label="Оценка мероприятия">
-              <button
-                v-for="value in 5"
-                :key="value"
-                type="button"
-                :class="{ active: feedbackForm.rating >= value }"
-                @click="feedbackForm.rating = value"
-              >
+              <button v-for="value in 5" :key="value" type="button" :class="{ active: feedbackForm.rating >= value }" @click="feedbackForm.rating = value">
                 <Star :size="22" />
               </button>
             </div>
@@ -383,7 +378,6 @@ onMounted(load)
             <button class="primary-action" type="submit">{{ myFeedback ? 'Обновить отзыв' : 'Отправить отзыв' }}</button>
           </form>
           <p v-else-if="!canManageEvent && item.status !== 'completed'" class="empty-state">Форма отзыва откроется после завершения мероприятия.</p>
-
           <article v-for="entry in feedback" :key="entry.id" class="feedback-row">
             <div>
               <strong>{{ entry.userName }}</strong>
@@ -393,8 +387,20 @@ onMounted(load)
             <p>{{ entry.comment || 'Без комментария' }}</p>
           </article>
           <p v-if="feedback.length === 0" class="empty-state">Отзывов пока нет.</p>
-        </section>
-      </div>
+        </div>
+      </section>
+
+      <section v-if="canManageEvent" class="detail-panel">
+        <p class="eyebrow">Смены</p>
+        <form class="settings-form shift-form" @submit.prevent="addShift">
+          <input v-model="shiftForm.title" placeholder="Название смены" required />
+          <input v-model="shiftForm.startsAt" type="datetime-local" required />
+          <input v-model="shiftForm.endsAt" type="datetime-local" required />
+          <input v-model="shiftForm.capacity" type="number" min="1" placeholder="лимит" />
+          <button class="primary-action" type="submit">Добавить смену</button>
+        </form>
+        <p v-for="shift in shifts" :key="shift.id">{{ shift.title }} · {{ formatDateTime(shift.startsAt) }}</p>
+      </section>
     </article>
   </section>
 </template>

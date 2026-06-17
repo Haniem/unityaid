@@ -1,7 +1,6 @@
 INSERT INTO organizations (id, name, slug, description, contact_email)
 VALUES
-	('11111111-1111-1111-1111-111111111111', 'Добрые руки', 'dobrye-ruki', 'Городская волонтерская организация помощи людям и социальным учреждениям.', 'hello@dobrye-ruki.test'),
-	('22222222-2222-2222-2222-222222222222', 'ЭкоПульс', 'ecopulse', 'Экологическое движение: уборки, лекции, раздельный сбор и городские акции.', 'team@ecopulse.test')
+	('11111111-1111-1111-1111-111111111111', 'Пульс Добра', 'puls-dobra', 'Демо-организация для защиты диплома: городские волонтерские акции, задачи, часы, новости и аналитика.', 'team@puls.test')
 ON CONFLICT (id) DO UPDATE SET
 	name = EXCLUDED.name,
 	slug = EXCLUDED.slug,
@@ -13,13 +12,9 @@ ON CONFLICT (id) DO UPDATE SET
 INSERT INTO users (id, email, password_hash, first_name, last_name, patronymic, avatar_url, locale, is_active, is_email_verified)
 VALUES
 	('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'admin@puls.test', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Павел', 'Зозин', 'Алексеевич', 'https://i.pravatar.cc/160?img=12', 'ru', true, true),
-	('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'org.admin@dobrye-ruki.test', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Анна', 'Крылова', 'Игоревна', 'https://i.pravatar.cc/160?img=5', 'ru', true, true),
-	('cccccccc-cccc-cccc-cccc-cccccccccccc', 'coord@dobrye-ruki.test', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Мария', 'Соколова', 'Петровна', 'https://i.pravatar.cc/160?img=9', 'ru', true, true),
-	('dddddddd-dddd-dddd-dddd-dddddddddddd', 'volunteer1@test.local', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Илья', 'Морозов', NULL, 'https://i.pravatar.cc/160?img=15', 'ru', true, true),
-	('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'volunteer2@test.local', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Екатерина', 'Волкова', NULL, 'https://i.pravatar.cc/160?img=20', 'ru', true, true),
-	('ffffffff-ffff-ffff-ffff-ffffffffffff', 'org.admin@ecopulse.test', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Олег', 'Никитин', NULL, 'https://i.pravatar.cc/160?img=32', 'ru', true, true),
-	('99999999-9999-9999-9999-999999999999', 'coord@ecopulse.test', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Наталья', 'Егорова', NULL, 'https://i.pravatar.cc/160?img=47', 'ru', true, true),
-	('88888888-8888-8888-8888-888888888888', 'volunteer3@test.local', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Денис', 'Лебедев', NULL, 'https://i.pravatar.cc/160?img=57', 'ru', true, true)
+	('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'admin1@puls.test', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Анна', 'Крылова', 'Игоревна', 'https://i.pravatar.cc/160?img=5', 'ru', true, true),
+	('cccccccc-cccc-cccc-cccc-cccccccccccc', 'admin2@puls.test', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Мария', 'Соколова', 'Петровна', 'https://i.pravatar.cc/160?img=9', 'ru', true, true),
+	('dddddddd-dddd-dddd-dddd-dddddddddddd', 'admin3@puls.test', '$2a$10$uISbNqAL/.aA87KggeAr6OohJh9J.uY2i7O8k7qJ5WqsPBFO9/ARa', 'Илья', 'Морозов', NULL, 'https://i.pravatar.cc/160?img=15', 'ru', true, true)
 ON CONFLICT (id) DO UPDATE SET
 	email = EXCLUDED.email,
 	password_hash = EXCLUDED.password_hash,
@@ -35,14 +30,9 @@ ON CONFLICT (id) DO UPDATE SET
 INSERT INTO organization_members (organization_id, user_id, role, status)
 VALUES
 	('11111111-1111-1111-1111-111111111111', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'super_admin', 'active'),
-	('22222222-2222-2222-2222-222222222222', 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'super_admin', 'active'),
 	('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'org_admin', 'active'),
 	('11111111-1111-1111-1111-111111111111', 'cccccccc-cccc-cccc-cccc-cccccccccccc', 'coordinator', 'active'),
-	('11111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'volunteer', 'active'),
-	('11111111-1111-1111-1111-111111111111', 'eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 'volunteer', 'active'),
-	('22222222-2222-2222-2222-222222222222', 'ffffffff-ffff-ffff-ffff-ffffffffffff', 'org_admin', 'active'),
-	('22222222-2222-2222-2222-222222222222', '99999999-9999-9999-9999-999999999999', 'coordinator', 'active'),
-	('22222222-2222-2222-2222-222222222222', '88888888-8888-8888-8888-888888888888', 'volunteer', 'active')
+	('11111111-1111-1111-1111-111111111111', 'dddddddd-dddd-dddd-dddd-dddddddddddd', 'volunteer', 'active')
 ON CONFLICT (organization_id, user_id) DO UPDATE SET
 	role = EXCLUDED.role,
 	status = EXCLUDED.status,

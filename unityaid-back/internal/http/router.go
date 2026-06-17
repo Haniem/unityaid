@@ -24,6 +24,7 @@ import (
 	"unityaid-back/internal/modules/notifications"
 	"unityaid-back/internal/modules/organizations"
 	"unityaid-back/internal/modules/profilefields"
+	"unityaid-back/internal/modules/shop"
 	"unityaid-back/internal/modules/tasks"
 	"unityaid-back/internal/modules/tenantsettings"
 	"unityaid-back/internal/modules/timeentries"
@@ -250,7 +251,20 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 	gamificationGroup := api.Group("/gamification", authMiddleware, auditMiddleware)
 	gamificationGroup.GET("/me", gamificationHandler.Me)
+	gamificationGroup.GET("/users/:userId", gamificationHandler.UserProfile)
 	gamificationGroup.GET("/leaderboard", gamificationHandler.Leaderboard)
+
+	shopRepository := shop.NewRepository(deps.DB)
+	shopService := shop.NewService(shopRepository)
+	shopHandler := shop.NewHandler(shopService, authorizer)
+
+	shopGroup := api.Group("/shop", authMiddleware, auditMiddleware)
+	shopGroup.GET("/wallet", shopHandler.Wallet)
+	shopGroup.POST("/wallet/transfers", shopHandler.Transfer)
+	shopGroup.GET("/products", shopHandler.Products)
+	shopGroup.GET("/orders", shopHandler.Orders)
+	shopGroup.POST("/orders", shopHandler.CreateOrder)
+	shopGroup.PATCH("/orders/:id", shopHandler.UpdateOrderStatus)
 
 	achievementsGroup := api.Group("/achievements", authMiddleware, auditMiddleware)
 	achievementsGroup.GET("", gamificationHandler.ListAchievements)
