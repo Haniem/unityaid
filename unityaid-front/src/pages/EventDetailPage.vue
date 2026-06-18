@@ -188,27 +188,41 @@ async function cancelApplication() {
 }
 
 async function setApplicationStatus(app: EventApplication, status: EventApplication['status'], rejectionReason = '') {
-  const response = await updateEventApplication(eventId, app.id, status, rejectionReason)
-  const index = applications.value.findIndex((entry) => entry.id === app.id)
-  if (index >= 0) applications.value[index] = response.item
-  applicationRejectionReasons[app.id] = ''
-  successMessage.value = `Статус заявки обновлен: ${applicationStatusLabels[response.item.status]}`
+  errorMessage.value = ''
+  successMessage.value = ''
+  try {
+    const response = await updateEventApplication(eventId, app.id, status, rejectionReason)
+    const index = applications.value.findIndex((entry) => entry.id === app.id)
+    if (index >= 0) applications.value[index] = response.item
+    applicationRejectionReasons[app.id] = ''
+    await reloadApplications()
+    successMessage.value = `Статус заявки обновлен: ${applicationStatusLabels[response.item.status]}`
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось обновить статус заявки'
+  }
 }
 
 async function bulkSetApplicationStatus(status: EventApplication['status']) {
   if (!selectedApplicationIds.value.length) return
-  const response = await bulkUpdateEventApplications(eventId, {
-    applicationIds: selectedApplicationIds.value,
-    status,
-    rejectionReason: status === 'rejected' ? bulkRejectionReason.value : ''
-  })
-  for (const updated of response.items) {
-    const index = applications.value.findIndex((app) => app.id === updated.id)
-    if (index >= 0) applications.value[index] = updated
+  errorMessage.value = ''
+  successMessage.value = ''
+  try {
+    const response = await bulkUpdateEventApplications(eventId, {
+      applicationIds: selectedApplicationIds.value,
+      status,
+      rejectionReason: status === 'rejected' ? bulkRejectionReason.value : ''
+    })
+    for (const updated of response.items) {
+      const index = applications.value.findIndex((app) => app.id === updated.id)
+      if (index >= 0) applications.value[index] = updated
+    }
+    selectedApplicationIds.value = []
+    bulkRejectionReason.value = ''
+    await reloadApplications()
+    successMessage.value = status === 'approved' ? 'Выбранные заявки подтверждены' : 'Выбранные заявки отклонены'
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось обновить выбранные заявки'
   }
-  selectedApplicationIds.value = []
-  bulkRejectionReason.value = ''
-  successMessage.value = status === 'approved' ? 'Выбранные заявки подтверждены' : 'Выбранные заявки отклонены'
 }
 
 async function markAttendance() {
@@ -341,7 +355,7 @@ onMounted(load)
         </div>
 
         <div v-if="activeTab === 'participants'" class="tab-panel">
-          <div v-if="canManageEvent" class="context-toolbar">
+          <div v-if="canManageEvent" class="context-toolbar event-attendance-toolbar">
             <input v-model="bulkAttendanceHours" type="number" min="0" step="0.25" placeholder="Часы для выбранных" />
             <button class="primary-action" type="button" :disabled="selectedAttendanceUserIds.length === 0" @click="markSelectedAttendance">
               Отметить выбранных
@@ -376,6 +390,7 @@ onMounted(load)
         </div>
 
         <div v-if="activeTab === 'applications'" class="tab-panel">
+          <p v-if="errorMessage" class="form-error">{{ errorMessage }}</p>
           <form v-if="!myApplication" class="settings-form application-form" @submit.prevent="applyToEvent">
             <textarea v-model="applicationMessage" rows="3" placeholder="Комментарий к заявке" />
             <button class="primary-action" type="submit">Подать заявку</button>

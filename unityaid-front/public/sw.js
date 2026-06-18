@@ -1,5 +1,5 @@
-const CACHE_NAME = 'puls-shell-v1'
-const SHELL_URLS = ['/', '/manifest.webmanifest', '/pwa-icon.svg']
+const CACHE_NAME = 'puls-shell-v2'
+const SHELL_URLS = ['/', '/manifest.webmanifest', '/favicon-32.png', '/apple-touch-icon.png', '/pwa-icon-192.png', '/pwa-icon-512.png']
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS)))

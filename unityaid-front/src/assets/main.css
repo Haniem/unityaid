@@ -4439,6 +4439,19 @@ a {
   align-items: start;
 }
 
+.task-work-tabs {
+  margin-top: 0;
+}
+
+.task-workspace {
+  display: grid;
+  gap: 18px;
+}
+
+.task-workspace .detail-panel {
+  min-height: 260px;
+}
+
 .assignee-list,
 .activity-list {
   display: grid;
@@ -4597,7 +4610,25 @@ a {
 }
 
 .context-toolbar input {
+  width: 100%;
   min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #dde1ec;
+  border-radius: 8px;
+  outline: 0;
+  color: #121a2f;
+  background: #ffffff;
+}
+
+.context-toolbar input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(47, 159, 114, 0.12);
+}
+
+.event-attendance-toolbar {
+  grid-template-columns: minmax(220px, 300px) minmax(220px, 300px);
+  justify-content: start;
 }
 
 .event-complete-action {

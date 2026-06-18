@@ -28,6 +28,7 @@ const comments = ref<TaskComment[]>([])
 const attachments = ref<TaskAttachment[]>([])
 const timeEntries = ref<TaskTimeEntry[]>([])
 const errorMessage = ref('')
+const activeWorkTab = ref<'assignees' | 'comments' | 'time'>('assignees')
 
 const assignment = reactive({ userId: '', role: 'assignee' })
 const comment = ref('')
@@ -56,6 +57,12 @@ const priorityLabels: Record<string, string> = {
 const assigneeRoleLabels: Record<string, string> = {
   assignee: 'исполнитель',
   co_assignee: 'соисполнитель'
+}
+
+const timeStatusLabels: Record<string, string> = {
+  pending: 'На проверке',
+  approved: 'Подтверждено',
+  rejected: 'Отклонено'
 }
 
 function initials(name: string) {
@@ -156,8 +163,14 @@ onMounted(load)
         <button class="primary-action task-confirm-action" type="button" @click="confirmDone">Подтвердить выполнение</button>
       </div>
 
-      <div class="management-grid task-management-grid">
-        <section class="detail-panel">
+      <div class="tabs task-work-tabs">
+        <button :class="{ active: activeWorkTab === 'assignees' }" type="button" @click="activeWorkTab = 'assignees'">Исполнители</button>
+        <button :class="{ active: activeWorkTab === 'comments' }" type="button" @click="activeWorkTab = 'comments'">Комментарии</button>
+        <button :class="{ active: activeWorkTab === 'time' }" type="button" @click="activeWorkTab = 'time'">Учет времени</button>
+      </div>
+
+      <div class="task-workspace">
+        <section v-if="activeWorkTab === 'assignees'" class="detail-panel">
           <p class="eyebrow">Исполнители</p>
           <form v-if="canManageTask" class="inline-member-form task-assignment-form" @submit.prevent="submitAssignment">
             <AsyncSelect v-model="assignment.userId" :load-options="loadUserOptions" placeholder="Выберите исполнителя" />
@@ -176,7 +189,7 @@ onMounted(load)
           </div>
         </section>
 
-        <section class="detail-panel">
+        <section v-if="activeWorkTab === 'comments'" class="detail-panel">
           <p class="eyebrow">Комментарии</p>
           <form class="settings-form" @submit.prevent="submitComment">
             <textarea v-model="comment" rows="3" placeholder="Добавьте рабочий комментарий" required />
@@ -188,7 +201,7 @@ onMounted(load)
           </div>
         </section>
 
-        <section class="detail-panel">
+        <section v-if="activeWorkTab === 'time'" class="detail-panel">
           <p class="eyebrow">Учет времени</p>
           <form v-if="canManageTask" class="inline-member-form task-time-form" @submit.prevent="submitTime">
             <input v-model="timeEntry.hours" type="number" step="0.25" placeholder="часы" required />
@@ -196,7 +209,7 @@ onMounted(load)
             <button class="primary-action" type="submit">Учесть</button>
           </form>
           <div class="activity-list">
-            <p v-for="entry in timeEntries" :key="entry.id">{{ entry.userName }} · {{ entry.hours }} ч. · {{ entry.status }}</p>
+            <p v-for="entry in timeEntries" :key="entry.id">{{ entry.userName }} · {{ entry.hours }} ч. · {{ timeStatusLabels[entry.status] || entry.status }}</p>
             <p v-if="!timeEntries.length" class="muted-text">Записей времени пока нет.</p>
           </div>
         </section>
