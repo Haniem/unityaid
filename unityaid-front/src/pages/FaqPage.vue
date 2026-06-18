@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Award, BarChart3, BookOpen, CalendarDays, CheckCircle2, HelpCircle, Newspaper, ShieldCheck, ShoppingCart, UsersRound } from 'lucide-vue-next'
+import { Award, BarChart3, BookOpen, CalendarDays, CheckCircle2, ChevronDown, HelpCircle, Newspaper, ShieldCheck, ShoppingCart, UsersRound } from 'lucide-vue-next'
 
 type HelpItem = {
   id: string
@@ -164,6 +164,7 @@ const sections: { id: string; label: string; items: HelpItem[] }[] = [
 
 const activeSectionId = ref(sections[0].id)
 const activeItemId = ref(sections[0].items[0].id)
+const isHelpNavOpen = ref(false)
 
 const activeItem = computed(() => sections.flatMap((section) => section.items).find((item) => item.id === activeItemId.value) ?? sections[0].items[0])
 const activeSection = computed(() => sections.find((section) => section.id === activeSectionId.value) ?? sections[0])
@@ -171,6 +172,7 @@ const activeSection = computed(() => sections.find((section) => section.id === a
 function selectItem(sectionId: string, itemId: string) {
   activeSectionId.value = sectionId
   activeItemId.value = itemId
+  isHelpNavOpen.value = false
 }
 </script>
 
@@ -182,12 +184,21 @@ function selectItem(sectionId: string, itemId: string) {
           <BookOpen :size="20" />
           <strong>Помощь</strong>
         </div>
-        <div v-for="section in sections" :key="section.id" class="help-nav-group">
-          <p>{{ section.label }}</p>
-          <button v-for="item in section.items" :key="item.id" :class="{ active: activeItemId === item.id }" type="button" @click="selectItem(section.id, item.id)">
-            <component :is="item.icon" :size="16" />
-            <span>{{ item.title }}</span>
-          </button>
+        <button class="help-nav-toggle" :class="{ open: isHelpNavOpen }" type="button" @click="isHelpNavOpen = !isHelpNavOpen">
+          <span>
+            <small>Разделы помощи</small>
+            <strong>{{ activeItem.title }}</strong>
+          </span>
+          <ChevronDown :size="18" />
+        </button>
+        <div class="help-nav-list" :class="{ open: isHelpNavOpen }">
+          <div v-for="section in sections" :key="section.id" class="help-nav-group">
+            <p>{{ section.label }}</p>
+            <button v-for="item in section.items" :key="item.id" :class="{ active: activeItemId === item.id }" type="button" @click="selectItem(section.id, item.id)">
+              <component :is="item.icon" :size="16" />
+              <span>{{ item.title }}</span>
+            </button>
+          </div>
         </div>
       </aside>
 
@@ -203,16 +214,10 @@ function selectItem(sectionId: string, itemId: string) {
           </ol>
         </section>
 
-        <div class="help-answer-grid">
-          <section>
-            <h2>Что показать на защите</h2>
-            <p>{{ activeItem.steps[0] }}</p>
-          </section>
-          <section>
-            <h2>Где искать результат</h2>
-            <p>{{ activeItem.result }}</p>
-          </section>
-        </div>
+        <section class="help-result-panel">
+          <h2>Где искать результат</h2>
+          <p>{{ activeItem.result }}</p>
+        </section>
       </article>
     </div>
   </section>

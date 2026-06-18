@@ -21,6 +21,8 @@ import {
   updateEventAttendance
 } from '../entities/events/api'
 import type { EventApplication, EventAttendance, EventFeedback, EventItem, EventShift } from '../entities/events/types'
+import { fetchTasks } from '../entities/tasks/api'
+import type { TaskItem } from '../entities/tasks/types'
 import { formatDateTime, fromDatetimeLocal } from '../shared/date'
 import CustomSelect from '../shared/ui/CustomSelect.vue'
 import PaginationBar from '../shared/ui/PaginationBar.vue'
@@ -33,6 +35,7 @@ const applications = ref<EventApplication[]>([])
 const attendance = ref<EventAttendance[]>([])
 const shifts = ref<EventShift[]>([])
 const feedback = ref<EventFeedback[]>([])
+const tasks = ref<TaskItem[]>([])
 const feedbackAverage = ref(0)
 const feedbackCount = ref(0)
 const attendanceHours = ref<Record<string, string>>({})
@@ -42,12 +45,14 @@ const bulkRejectionReason = ref('')
 const bulkAttendanceHours = ref('')
 const errorMessage = ref('')
 const successMessage = ref('')
+const activeDetailTab = ref<'management' | 'tasks'>('management')
 const activeTab = ref<'participants' | 'applications' | 'feedback'>('participants')
 
 const applicationMessage = ref('')
 const attendanceForm = reactive({ userId: '', hours: '' })
 const shiftForm = reactive({ title: '', startsAt: '', endsAt: '', capacity: '' })
 const feedbackForm = reactive({ rating: 5, comment: '' })
+const taskFilters = reactive({ startsAt: '', endsAt: '', location: '', status: '' })
 const { page: applicationsPage, perPage: applicationsPerPage, pageItems: applicationsPageItems } = useClientPagination(applications, 8)
 const { page: attendancePage, perPage: attendancePerPage, pageItems: attendancePageItems } = useClientPagination(attendance, 8)
 
@@ -105,6 +110,41 @@ const eventFormatLabels: Record<string, string> = {
   hybrid: 'Гибрид'
 }
 
+const taskStatusLabels: Record<string, string> = {
+  created: 'Создана',
+  assigned: 'Назначена',
+  in_progress: 'В работе',
+  review: 'На проверке',
+  completed: 'Выполнена',
+  cancelled: 'Отменена'
+}
+
+const taskStatusOptions = [
+  { id: '', name: 'Все статусы' },
+  { id: 'created', name: 'Создана' },
+  { id: 'assigned', name: 'Назначена' },
+  { id: 'in_progress', name: 'В работе' },
+  { id: 'review', name: 'На проверке' },
+  { id: 'completed', name: 'Выполнена' },
+  { id: 'cancelled', name: 'Отменена' }
+]
+
+const filteredEventTasks = computed(() => {
+  const location = taskFilters.location.trim().toLowerCase()
+  const startsAt = taskFilters.startsAt ? new Date(taskFilters.startsAt) : null
+  const endsAt = taskFilters.endsAt ? new Date(`${taskFilters.endsAt}T23:59:59`) : null
+
+  return tasks.value.filter((task) => {
+    if (task.eventId !== eventId) return false
+    if (taskFilters.status && task.status !== taskFilters.status) return false
+    if (location && !(item.value?.location ?? '').toLowerCase().includes(location)) return false
+    const dueAt = task.dueAt ? new Date(task.dueAt) : null
+    if (startsAt && (!dueAt || dueAt < startsAt)) return false
+    if (endsAt && (!dueAt || dueAt > endsAt)) return false
+    return true
+  })
+})
+
 async function loadFeedback() {
   const response = await fetchEventFeedback(eventId)
   feedback.value = response.items
@@ -116,9 +156,14 @@ async function load() {
   try {
     errorMessage.value = ''
     item.value = (await fetchEvent(eventId)).item
-    const [appsResponse, shiftsResponse] = await Promise.all([fetchEventApplications(eventId), fetchEventShifts(eventId)])
+    const [appsResponse, shiftsResponse, tasksResponse] = await Promise.all([
+      fetchEventApplications(eventId),
+      fetchEventShifts(eventId),
+      fetchTasks()
+    ])
     applications.value = appsResponse.items
     shifts.value = shiftsResponse.items
+    tasks.value = tasksResponse.items
     await loadFeedback()
     if (canManageEvent.value) {
       const attendanceResponse = await fetchEventAttendance(eventId)
@@ -246,7 +291,7 @@ onMounted(load)
     <article v-else-if="item" class="detail-layout wide event-detail-page">
       <div class="page-heading">
         <div>
-          <p class="eyebrow">{{ item.organizationName }}</p>
+          <RouterLink class="eyebrow link-eyebrow" :to="`/organizations/${item.organizationId}`">{{ item.organizationName }}</RouterLink>
           <h1>{{ item.title }}</h1>
         </div>
         <RouterLink class="secondary-action" to="/calendar">К списку</RouterLink>
@@ -267,7 +312,12 @@ onMounted(load)
         </button>
       </div>
 
-      <section v-if="canManageEvent" class="detail-panel coordinator-console">
+      <div class="tabs detail-tabs">
+        <button :class="{ active: activeDetailTab === 'management' }" type="button" @click="activeDetailTab = 'management'">Управление</button>
+        <button :class="{ active: activeDetailTab === 'tasks' }" type="button" @click="activeDetailTab = 'tasks'">Задачи</button>
+      </div>
+
+      <section v-if="activeDetailTab === 'management' && canManageEvent" class="detail-panel coordinator-console">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Координатор</p>
@@ -282,7 +332,13 @@ onMounted(load)
         </div>
       </section>
 
-      <section class="detail-panel event-workspace">
+      <section v-if="activeDetailTab === 'management'" class="detail-panel event-workspace">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Участие</p>
+            <h2>Участники, заявки и отзывы</h2>
+          </div>
+        </div>
         <div class="tabs">
           <button :class="{ active: activeTab === 'participants' }" type="button" @click="activeTab = 'participants'">Участники</button>
           <button :class="{ active: activeTab === 'applications' }" type="button" @click="activeTab = 'applications'">Заявки</button>
@@ -390,8 +446,13 @@ onMounted(load)
         </div>
       </section>
 
-      <section v-if="canManageEvent" class="detail-panel">
-        <p class="eyebrow">Смены</p>
+      <section v-if="activeDetailTab === 'management' && canManageEvent" class="detail-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">План смен</p>
+            <h2>Смены мероприятия</h2>
+          </div>
+        </div>
         <form class="settings-form shift-form" @submit.prevent="addShift">
           <input v-model="shiftForm.title" placeholder="Название смены" required />
           <input v-model="shiftForm.startsAt" type="datetime-local" required />
@@ -400,6 +461,31 @@ onMounted(load)
           <button class="primary-action" type="submit">Добавить смену</button>
         </form>
         <p v-for="shift in shifts" :key="shift.id">{{ shift.title }} · {{ formatDateTime(shift.startsAt) }}</p>
+      </section>
+
+      <section v-if="activeDetailTab === 'tasks'" class="detail-panel">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">Задачи мероприятия</p>
+            <h2>{{ filteredEventTasks.length }} задач</h2>
+          </div>
+        </div>
+        <div class="filter-bar event-task-filters">
+          <label class="filter-select"><span>С даты</span><input v-model="taskFilters.startsAt" type="date" /></label>
+          <label class="filter-select"><span>По дату</span><input v-model="taskFilters.endsAt" type="date" /></label>
+          <label class="filter-select"><span>Место</span><input v-model="taskFilters.location" placeholder="Место проведения" /></label>
+          <label class="filter-select"><span>Статус</span><CustomSelect v-model="taskFilters.status" :options="taskStatusOptions" /></label>
+        </div>
+        <div class="member-list">
+          <article v-for="task in filteredEventTasks" :key="task.id" class="member-row linked-row">
+            <div>
+              <RouterLink :to="`/tasks/${task.id}`"><strong>{{ task.title }}</strong></RouterLink>
+              <small>{{ task.dueAt ? formatDateTime(task.dueAt) : 'Срок не указан' }} · {{ task.assignees.map((assignee) => assignee.name).join(', ') || 'исполнители не назначены' }}</small>
+            </div>
+            <span class="status-pill">{{ taskStatusLabels[task.status] || task.status }}</span>
+          </article>
+          <p v-if="filteredEventTasks.length === 0" class="empty-state">Для выбранных фильтров задач нет.</p>
+        </div>
       </section>
     </article>
   </section>

@@ -180,6 +180,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 	invitationsRepository := invitations.NewRepository(deps.DB)
 	invitationsService := invitations.NewService(invitationsRepository)
 	invitationsHandler := invitations.NewHandler(invitationsService)
+	api.GET("/invitations/:token", invitationsHandler.GetByToken)
+	api.POST("/invitations/:token/register", authLimiter, invitationsHandler.AcceptRegistration)
 	invitationsGroup := api.Group("/invitations", authMiddleware, auditMiddleware)
 	invitationsGroup.GET("", canManageOrganizations, invitationsHandler.List)
 	invitationsGroup.POST("", canManageOrganizations, invitationsHandler.Create)

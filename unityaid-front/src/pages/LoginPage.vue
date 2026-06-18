@@ -16,7 +16,7 @@ const route = useRoute()
 const router = useRouter()
 
 const mode = ref<AuthMode>('login')
-const email = ref('admin@puls.test')
+const email = ref(typeof route.query.email === 'string' ? route.query.email : 'admin@puls.test')
 const password = ref('password')
 const firstName = ref('')
 const lastName = ref('')

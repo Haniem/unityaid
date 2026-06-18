@@ -45,6 +45,37 @@ func (h *Handler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"item": item})
 }
 
+func (h *Handler) GetByToken(c *gin.Context) {
+	item, err := h.service.FindByToken(c.Request.Context(), c.Param("token"))
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Invitation not found"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not load invitation"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"item": item})
+}
+
+func (h *Handler) AcceptRegistration(c *gin.Context) {
+	var request AcceptRegistrationRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
+		return
+	}
+	item, err := h.service.AcceptRegistration(c.Request.Context(), c.Param("token"), request)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Invitation not found or expired"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not accept invitation"})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"item": item})
+}
+
 func (h *Handler) Accept(c *gin.Context) {
 	claims, ok := auth.GetClaims(c)
 	if !ok {

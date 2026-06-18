@@ -46,6 +46,10 @@ const averageLevel = computed(() => {
   return volunteers.value.reduce((sum, item) => sum + item.level, 0) / volunteers.value.length
 })
 
+function initials(firstName?: string, lastName?: string) {
+  return `${firstName?.[0] ?? ''}${lastName?.[0] ?? ''}`.toUpperCase() || 'П'
+}
+
 async function openEditModal(item: VolunteerProfile) {
   editing.value = item
   formSchema.value = await fetchEditForm('volunteers', item.userId)
@@ -257,7 +261,8 @@ onMounted(load)
         <article v-for="item in pageItems" :key="item.id" class="directory-card volunteer-card">
           <div class="directory-card-main">
             <div class="volunteer-card-head">
-              <img :src="item.avatarUrl ?? 'https://i.pravatar.cc/160?img=12'" alt="" />
+              <img v-if="item.avatarUrl" :src="item.avatarUrl" alt="" />
+              <span v-else class="mini-avatar">{{ initials(item.firstName, item.lastName) }}</span>
               <span class="status-pill">{{ item.level }} уровень</span>
               <span :class="['status-pill', `volunteer-status-${item.status}`]">{{ statusLabel(item.status) }}</span>
             </div>
@@ -328,7 +333,7 @@ onMounted(load)
           <div class="invite-list compact-list">
             <article v-for="invite in invitations.slice(0, 4)" :key="invite.id" class="invite-card">
               <div>
-                <span>{{ invite.email }}</span>
+                <span>{{ invite.email || invite.organizationName || 'Ссылка для регистрации' }}</span>
                 <small>{{ invitationStatusLabel(invite.status) }} · {{ invite.role }}</small>
                 <small class="copy-line"><Link2 :size="13" /> {{ invite.link }}</small>
               </div>

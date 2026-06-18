@@ -73,8 +73,16 @@ const createActions = [
 const fullName = computed(() => {
   const user = authState.user
   if (!user) return ''
-  return [user.lastName, user.firstName, user.patronymic].filter(Boolean).join(' ')
+  return [user.lastName, user.firstName].filter(Boolean).join(' ')
 })
+
+const userInitials = computed(() => {
+  const user = authState.user
+  if (!user) return 'П'
+  return `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase() || 'П'
+})
+
+const canOpenSettings = computed(() => ['super_admin', 'org_admin', 'coordinator'].includes(authState.user?.primaryRole ?? ''))
 
 const visibleNotifications = computed(() => {
   if (notificationTab.value === 'unread') {
@@ -149,6 +157,15 @@ async function toggleNotifications() {
   }
 }
 
+async function openNotificationsFromUserMenu() {
+  isUserMenuOpen.value = false
+  isNavigationMenuOpen.value = false
+  isCreateMenuOpen.value = false
+  isNotificationsOpen.value = true
+  notificationTab.value = 'all'
+  await loadNotifications()
+}
+
 async function readNotification(item: NotificationItem) {
   if (!item.isRead) {
     await markNotificationRead(item.id)
@@ -217,10 +234,10 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="topbar-actions">
-      <button ref="createButtonRef" class="icon-button accent" type="button" aria-label="Создать" @click="toggleCreateMenu"><Plus :size="20" /></button>
+      <button ref="createButtonRef" class="icon-button accent topbar-secondary-action" type="button" aria-label="Создать" @click="toggleCreateMenu"><Plus :size="20" /></button>
       <button
         ref="notificationsButtonRef"
-        :class="['icon-button', { accent: isNotificationsOpen }]"
+        :class="['icon-button topbar-secondary-action', { accent: isNotificationsOpen }]"
         type="button"
         aria-label="Уведомления"
         @click="toggleNotifications"
@@ -228,8 +245,8 @@ onBeforeUnmount(() => {
         <Bell :size="19" />
         <span v-if="unreadCount > 0" class="badge">{{ unreadCount }}</span>
       </button>
-      <button class="icon-button" type="button" aria-label="FAQ" @click="router.push('/faq')"><HelpCircle :size="19" /></button>
-      <button class="icon-button" type="button" aria-label="Настройки" @click="router.push('/settings')"><Settings :size="19" /></button>
+      <button class="icon-button topbar-secondary-action" type="button" aria-label="FAQ" @click="router.push('/faq')"><HelpCircle :size="19" /></button>
+      <button v-if="canOpenSettings" class="icon-button topbar-secondary-action" type="button" aria-label="Настройки" @click="router.push('/settings')"><Settings :size="19" /></button>
       <button
         ref="navigationButtonRef"
         :class="['icon-button', { accent: isNavigationMenuOpen }]"
@@ -240,39 +257,45 @@ onBeforeUnmount(() => {
         <Menu :size="20" />
       </button>
       <button ref="avatarRef" class="avatar-button" type="button" aria-label="Меню пользователя" @click="toggleUserMenu">
-        <img :src="authState.user?.avatarUrl ?? 'https://i.pravatar.cc/160?img=12'" alt="" />
+        <img v-if="authState.user?.avatarUrl" :src="authState.user.avatarUrl" alt="" />
+        <span v-else class="avatar-fallback compact">{{ userInitials }}</span>
       </button>
     </div>
 
-    <div v-if="isCreateMenuOpen" ref="createPopoverRef" class="create-popover">
-      <RouterLink
-        v-for="action in createActions"
-        :key="action.to"
-        class="create-popover-link"
-        :to="action.to"
-        @click="isCreateMenuOpen = false"
-      >
-        <component :is="action.icon" :size="18" />
-        <span>{{ action.label }}</span>
-      </RouterLink>
-    </div>
+    <Transition name="popover-scale">
+      <div v-if="isCreateMenuOpen" ref="createPopoverRef" class="create-popover">
+        <RouterLink
+          v-for="action in createActions"
+          :key="action.to"
+          class="create-popover-link"
+          :to="action.to"
+          @click="isCreateMenuOpen = false"
+        >
+          <component :is="action.icon" :size="18" />
+          <span>{{ action.label }}</span>
+        </RouterLink>
+      </div>
+    </Transition>
 
-    <nav v-if="isNavigationMenuOpen" ref="navigationPopoverRef" class="navigation-popover" aria-label="Основное меню">
-      <RouterLink
-        v-for="item in navigationItems"
-        :key="item.to"
-        :to="item.to"
-        :class="['navigation-popover-link', { active: isActive(item.to) }]"
-        @click="isNavigationMenuOpen = false"
-      >
-        <component :is="item.icon" :size="18" />
-        <span>{{ item.label }}</span>
-      </RouterLink>
-    </nav>
+    <Transition name="popover-scale">
+      <nav v-if="isNavigationMenuOpen" ref="navigationPopoverRef" class="navigation-popover" aria-label="Основное меню">
+        <RouterLink
+          v-for="item in navigationItems"
+          :key="item.to"
+          :to="item.to"
+          :class="['navigation-popover-link', { active: isActive(item.to) }]"
+          @click="isNavigationMenuOpen = false"
+        >
+          <component :is="item.icon" :size="18" />
+          <span>{{ item.label }}</span>
+        </RouterLink>
+      </nav>
+    </Transition>
 
     <Teleport to="body">
-      <div v-if="isNotificationsOpen" class="modal-backdrop notifications-backdrop" @click.self="closeNotifications">
-        <section class="modal-panel notifications-modal" role="dialog" aria-modal="true" aria-label="Уведомления">
+      <Transition name="modal-fade">
+        <div v-if="isNotificationsOpen" class="modal-backdrop notifications-backdrop" @click.self="closeNotifications">
+          <section class="modal-panel notifications-modal" role="dialog" aria-modal="true" aria-label="Уведомления">
           <div class="modal-heading">
             <div>
               <p class="eyebrow">Центр уведомлений</p>
@@ -309,25 +332,56 @@ onBeforeUnmount(() => {
           <p v-else class="notification-empty">
             {{ notificationTab === 'unread' ? 'Непрочитанных уведомлений нет.' : 'Уведомлений пока нет.' }}
           </p>
-        </section>
-      </div>
+          </section>
+        </div>
+      </Transition>
     </Teleport>
 
-    <div v-if="isUserMenuOpen" ref="userPopoverRef" class="user-popover">
-      <div class="popover-user">
-        <img :src="authState.user?.avatarUrl ?? 'https://i.pravatar.cc/160?img=12'" alt="" />
-        <strong>{{ fullName }}</strong>
+    <Transition name="popover-scale">
+      <div v-if="isUserMenuOpen" ref="userPopoverRef" class="user-popover">
+        <div class="popover-user">
+          <img v-if="authState.user?.avatarUrl" :src="authState.user.avatarUrl" alt="" />
+          <span v-else class="avatar-fallback compact">{{ userInitials }}</span>
+          <strong>{{ fullName }}</strong>
+        </div>
+
+        <RouterLink class="popover-link" to="/profile" @click="isUserMenuOpen = false">
+          <UserRound :size="17" />
+          <span>Мой профиль</span>
+        </RouterLink>
+
+        <div class="mobile-user-actions">
+          <p>Быстрые действия</p>
+          <RouterLink
+            v-for="action in createActions"
+            :key="action.to"
+            class="popover-link"
+            :to="action.to"
+            @click="isUserMenuOpen = false"
+          >
+            <component :is="action.icon" :size="17" />
+            <span>{{ action.label }}</span>
+          </RouterLink>
+          <button class="popover-link" type="button" @click="openNotificationsFromUserMenu">
+            <Bell :size="17" />
+            <span>Уведомления</span>
+            <span v-if="unreadCount > 0" class="badge inline-badge">{{ unreadCount }}</span>
+          </button>
+          <RouterLink class="popover-link" to="/faq" @click="isUserMenuOpen = false">
+            <HelpCircle :size="17" />
+            <span>FAQ</span>
+          </RouterLink>
+          <RouterLink v-if="canOpenSettings" class="popover-link" to="/settings" @click="isUserMenuOpen = false">
+            <Settings :size="17" />
+            <span>Настройки</span>
+          </RouterLink>
+        </div>
+
+        <button class="popover-link danger" type="button" @click="signOut">
+          <LogOut :size="17" />
+          <span>Выйти из аккаунта</span>
+        </button>
       </div>
-
-      <RouterLink class="popover-link" to="/profile" @click="isUserMenuOpen = false">
-        <UserRound :size="17" />
-        <span>Мой профиль</span>
-      </RouterLink>
-
-      <button class="popover-link danger" type="button" @click="signOut">
-        <LogOut :size="17" />
-        <span>Выйти из аккаунта</span>
-      </button>
-    </div>
+    </Transition>
   </header>
 </template>

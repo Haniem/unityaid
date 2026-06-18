@@ -3,6 +3,7 @@ import { authState, fetchCurrentUser } from '../entities/auth/store'
 import AppLayout from '../widgets/layout/AppLayout.vue'
 import DashboardPage from '../pages/DashboardPage.vue'
 import LoginPage from '../pages/LoginPage.vue'
+import InviteRegisterPage from '../pages/InviteRegisterPage.vue'
 import NewsDetailPage from '../pages/NewsDetailPage.vue'
 import NewsFormPage from '../pages/NewsFormPage.vue'
 import NewsListPage from '../pages/NewsListPage.vue'
@@ -40,6 +41,12 @@ export const router = createRouter({
       meta: { public: true }
     },
     {
+      path: '/register',
+      name: 'invite-register',
+      component: InviteRegisterPage,
+      meta: { public: true }
+    },
+    {
       path: '/',
       component: AppLayout,
       children: [
@@ -72,17 +79,20 @@ export const router = createRouter({
         {
           path: 'settings',
           name: 'settings',
-          component: SettingsPage
+          component: SettingsPage,
+          meta: { roles: ['super_admin', 'org_admin', 'coordinator'] }
         },
         {
           path: 'settings/:section',
           name: 'settings-section',
-          component: SettingsPage
+          component: SettingsPage,
+          meta: { roles: ['super_admin', 'org_admin', 'coordinator'] }
         },
         {
           path: 'settings/profile-fields/manage',
           name: 'profile-fields-settings',
-          component: ProfileFieldsSettingsPage
+          component: ProfileFieldsSettingsPage,
+          meta: { roles: ['super_admin', 'org_admin'] }
         },
         {
           path: 'admin',

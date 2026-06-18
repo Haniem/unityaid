@@ -53,6 +53,15 @@ function progressPercent() {
   return `${Math.min(100, Math.max(0, (profile.value?.levelProgress ?? 0) * 100)).toFixed(0)}%`
 }
 
+function initials(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('') || 'П'
+}
+
 onMounted(load)
 </script>
 
@@ -121,7 +130,8 @@ onMounted(load)
           </div>
           <article v-for="entry in leaderboard" :key="entry.userId" class="leaderboard-row">
             <strong>{{ entry.rank }}</strong>
-            <img :src="entry.avatarUrl ?? 'https://i.pravatar.cc/160?img=12'" alt="" />
+            <img v-if="entry.avatarUrl" :src="entry.avatarUrl" alt="" />
+            <span v-else class="mini-avatar">{{ initials(entry.userName) }}</span>
             <div>
               <span>{{ entry.userName }}</span>
               <small>{{ entry.totalHours.toFixed(1) }} ч. · {{ entry.level }} уровень</small>

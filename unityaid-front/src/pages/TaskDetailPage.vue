@@ -135,7 +135,18 @@ onMounted(load)
         <div class="detail-metrics">
           <div><Flag :size="18" /><span>Приоритет: {{ priorityLabels[item.priority] || item.priority }}</span></div>
           <div><Clock3 :size="18" /><span>Срок: {{ formatDateTime(item.dueAt) || 'не указан' }}</span></div>
-          <div><LinkIcon :size="18" /><span>{{ item.eventTitle || 'Без мероприятия' }}</span></div>
+          <div>
+            <LinkIcon :size="18" />
+            <RouterLink v-if="item.eventId" :to="`/calendar/${item.eventId}`">{{ item.eventTitle || 'Мероприятие' }}</RouterLink>
+            <span v-else>Без мероприятия</span>
+          </div>
+        </div>
+        <div class="task-attachments-inline">
+          <p class="eyebrow">Вложения</p>
+          <div v-if="attachments.length" class="attachment-list">
+            <a v-for="file in attachments" :key="file.id" :href="file.fileUrl" target="_blank">{{ file.fileName }}</a>
+          </div>
+          <p v-else class="muted-text">Вложения добавляются в форме редактирования задачи.</p>
         </div>
         <button class="primary-action task-confirm-action" type="button" @click="confirmDone">Подтвердить выполнение</button>
       </div>
@@ -170,12 +181,6 @@ onMounted(load)
             <p v-for="entry in comments" :key="entry.id"><strong>{{ entry.userName }}:</strong> {{ entry.content }}</p>
             <p v-if="!comments.length" class="muted-text">Комментариев пока нет.</p>
           </div>
-        </section>
-
-        <section class="detail-panel">
-          <p class="eyebrow">Вложения</p>
-          <p v-for="file in attachments" :key="file.id"><a :href="file.fileUrl" target="_blank">{{ file.fileName }}</a></p>
-          <p v-if="!attachments.length" class="muted-text">Вложения добавляются в форме редактирования задачи.</p>
         </section>
 
         <section class="detail-panel">

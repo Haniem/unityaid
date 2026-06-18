@@ -1,10 +1,12 @@
 export type Invitation = {
   id: string
-  email: string
+  email?: string | null
   role: string
   token: string
   link: string
   status: 'pending' | 'accepted' | 'revoked' | 'expired'
+  organizationId?: string | null
+  organizationName?: string | null
   invitedBy?: string | null
   acceptedBy?: string | null
   expiresAt: string
@@ -14,6 +16,15 @@ export type Invitation = {
 }
 
 export type InvitationPayload = {
-  email: string
+  email?: string
   role: string
+  organizationId?: string
+}
+
+export type InvitationRegistrationPayload = {
+  email: string
+  password: string
+  firstName: string
+  lastName: string
+  patronymic?: string
 }
