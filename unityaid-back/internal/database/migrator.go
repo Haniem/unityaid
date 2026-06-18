@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -64,9 +65,17 @@ func runSQLFiles(ctx context.Context, db *pgxpool.Pool, dir string, table string
 			return err
 		}
 
-		if _, err := tx.Exec(ctx, string(sqlBytes)); err != nil {
+		statements, err := splitSQLStatements(string(sqlBytes))
+		if err != nil {
 			_ = tx.Rollback(ctx)
-			return fmt.Errorf("%s failed: %w", name, err)
+			return fmt.Errorf("%s parse failed: %w", name, err)
+		}
+
+		for index, statement := range statements {
+			if _, err := tx.Exec(ctx, statement); err != nil {
+				_ = tx.Rollback(ctx)
+				return fmt.Errorf("%s statement %d failed: %w", name, index+1, err)
+			}
 		}
 
 		if _, err := tx.Exec(ctx, fmt.Sprintf("INSERT INTO %s (name) VALUES ($1)", table), name); err != nil {
@@ -80,4 +89,142 @@ func runSQLFiles(ctx context.Context, db *pgxpool.Pool, dir string, table string
 	}
 
 	return nil
+}
+
+func splitSQLStatements(script string) ([]string, error) {
+	var statements []string
+	var current strings.Builder
+	var dollarTag string
+	inSingleQuote := false
+	inDoubleQuote := false
+	inLineComment := false
+	inBlockComment := false
+
+	for i := 0; i < len(script); i++ {
+		ch := script[i]
+		var next byte
+		if i+1 < len(script) {
+			next = script[i+1]
+		}
+
+		if inLineComment {
+			current.WriteByte(ch)
+			if ch == '\n' {
+				inLineComment = false
+			}
+			continue
+		}
+
+		if inBlockComment {
+			current.WriteByte(ch)
+			if ch == '*' && next == '/' {
+				current.WriteByte(next)
+				i++
+				inBlockComment = false
+			}
+			continue
+		}
+
+		if dollarTag != "" {
+			current.WriteByte(ch)
+			if strings.HasPrefix(script[i:], dollarTag) {
+				for j := 1; j < len(dollarTag); j++ {
+					current.WriteByte(script[i+j])
+				}
+				i += len(dollarTag) - 1
+				dollarTag = ""
+			}
+			continue
+		}
+
+		if inSingleQuote {
+			current.WriteByte(ch)
+			if ch == '\'' {
+				if next == '\'' {
+					current.WriteByte(next)
+					i++
+				} else {
+					inSingleQuote = false
+				}
+			}
+			continue
+		}
+
+		if inDoubleQuote {
+			current.WriteByte(ch)
+			if ch == '"' {
+				if next == '"' {
+					current.WriteByte(next)
+					i++
+				} else {
+					inDoubleQuote = false
+				}
+			}
+			continue
+		}
+
+		switch {
+		case ch == '-' && next == '-':
+			current.WriteByte(ch)
+			current.WriteByte(next)
+			i++
+			inLineComment = true
+		case ch == '/' && next == '*':
+			current.WriteByte(ch)
+			current.WriteByte(next)
+			i++
+			inBlockComment = true
+		case ch == '\'':
+			current.WriteByte(ch)
+			inSingleQuote = true
+		case ch == '"':
+			current.WriteByte(ch)
+			inDoubleQuote = true
+		case ch == '$':
+			if tag, ok := readDollarQuoteTag(script[i:]); ok {
+				current.WriteString(tag)
+				i += len(tag) - 1
+				dollarTag = tag
+			} else {
+				current.WriteByte(ch)
+			}
+		case ch == ';':
+			statement := strings.TrimSpace(current.String())
+			if statement != "" {
+				statements = append(statements, statement)
+			}
+			current.Reset()
+		default:
+			current.WriteByte(ch)
+		}
+	}
+
+	if inSingleQuote || inDoubleQuote || inBlockComment || dollarTag != "" {
+		return nil, fmt.Errorf("unterminated SQL literal or comment")
+	}
+
+	statement := strings.TrimSpace(current.String())
+	if statement != "" {
+		statements = append(statements, statement)
+	}
+
+	return statements, nil
+}
+
+func readDollarQuoteTag(input string) (string, bool) {
+	if len(input) < 2 || input[0] != '$' {
+		return "", false
+	}
+	for i := 1; i < len(input); i++ {
+		if input[i] == '$' {
+			return input[:i+1], true
+		}
+		if i == 1 && unicode.IsDigit(rune(input[i])) {
+			return "", false
+		}
+		if input[i] != '_' && !unicode.IsLetter(rune(input[i])) && !unicode.IsDigit(rune(input[i])) {
+			return "", false
+		}
+	}
+	return "", false
 }
