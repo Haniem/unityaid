@@ -1,6 +1,6 @@
 import { apiRequest } from '../../shared/api'
 import { authState } from '../auth/store'
-import type { Product, ShopOrder, Wallet } from './types'
+import type { CreateProductPayload, Product, ShopOrder, Wallet } from './types'
 
 const token = () => authState.token
 
@@ -12,6 +12,9 @@ export const transferCoins = (payload: { recipientId: string; amount: number; co
 
 export const fetchProducts = () =>
   apiRequest<{ items: Product[] }>('/shop/products', { token: token() })
+
+export const createProduct = (payload: CreateProductPayload) =>
+  apiRequest<{ item: Product }>('/shop/products', { method: 'POST', token: token(), body: JSON.stringify(payload) })
 
 export const createShopOrder = (payload: { items: { productId: string; quantity: number }[]; comment?: string }) =>
   apiRequest<{ item: ShopOrder }>('/shop/orders', { method: 'POST', token: token(), body: JSON.stringify(payload) })

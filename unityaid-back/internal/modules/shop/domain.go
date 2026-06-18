@@ -63,6 +63,16 @@ type CreateOrderItem struct {
 	Quantity  int    `json:"quantity" binding:"required,min=1"`
 }
 
+type CreateProductRequest struct {
+	OrganizationID *string `json:"organizationId"`
+	Name           string  `json:"name" binding:"required"`
+	Description    string  `json:"description"`
+	Price          int     `json:"price" binding:"required,min=1"`
+	Stock          int     `json:"stock" binding:"min=0"`
+	ImageURL       *string `json:"imageUrl"`
+	IsActive       *bool   `json:"isActive"`
+}
+
 type TransferRequest struct {
 	RecipientID string `json:"recipientId" binding:"required"`
 	Amount      int    `json:"amount" binding:"required,min=1"`

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { CheckCircle2, Coins, Gift, Minus, PackageCheck, Plus, Send, ShoppingCart } from 'lucide-vue-next'
-import { createShopOrder, fetchProducts, fetchShopOrders, fetchWallet, transferCoins, updateShopOrderStatus } from '../entities/shop/api'
+import { CheckCircle2, Coins, Gift, Minus, PackageCheck, PackagePlus, Plus, Send, ShoppingCart } from 'lucide-vue-next'
+import { createProduct, createShopOrder, fetchProducts, fetchShopOrders, fetchWallet, transferCoins, updateShopOrderStatus } from '../entities/shop/api'
 import type { Product, ShopOrder, Wallet } from '../entities/shop/types'
 import { authState } from '../entities/auth/store'
 import { fetchVolunteers } from '../entities/users/api'
@@ -11,7 +11,7 @@ import CustomSelect from '../shared/ui/CustomSelect.vue'
 import PaginationBar from '../shared/ui/PaginationBar.vue'
 import { useClientPagination } from '../shared/pagination'
 
-type Tab = 'products' | 'orders' | 'manage'
+type Tab = 'products' | 'orders' | 'manage' | 'catalog'
 
 const products = ref<Product[]>([])
 const orders = ref<ShopOrder[]>([])
@@ -21,9 +21,11 @@ const activeTab = ref<Tab>('products')
 const errorMessage = ref('')
 const successMessage = ref('')
 const isLoading = ref(true)
+const isSavingProduct = ref(false)
 const cart = reactive<Record<string, number>>({})
 const checkoutComment = ref('')
 const transfer = reactive({ recipientId: '', amount: '', comment: '' })
+const productForm = reactive({ name: '', description: '', price: '', stock: '', imageUrl: '' })
 const { page: productPage, perPage: productPerPage, pageItems: productPageItems } = useClientPagination(products, 8)
 const { page: orderPage, perPage: orderPerPage, pageItems: orderPageItems } = useClientPagination(orders, 8)
 const { page: managePage, perPage: managePerPage, pageItems: managePageItems } = useClientPagination(allOrders, 8)
@@ -32,6 +34,7 @@ const isManager = computed(() => ['super_admin', 'org_admin', 'coordinator'].inc
 const cartItems = computed(() => products.value.filter((product) => (cart[product.id] ?? 0) > 0).map((product) => ({ product, quantity: cart[product.id] })))
 const cartTotal = computed(() => cartItems.value.reduce((sum, item) => sum + item.product.price * item.quantity, 0))
 const canCheckout = computed(() => cartItems.value.length > 0 && (wallet.value?.balance ?? 0) >= cartTotal.value)
+const canSubmitProduct = computed(() => productForm.name.trim().length > 0 && Number(productForm.price) > 0 && productForm.stock !== '' && Number(productForm.stock) >= 0)
 const orderStatusOptions = [
   { id: 'pending', name: 'Новый' },
   { id: 'processing', name: 'В обработке' },
@@ -49,7 +52,8 @@ function transactionLabel(type: string) {
     demo_bonus: 'Демо-бонус',
     transfer_in: 'Получено',
     transfer_out: 'Перевод',
-    purchase: 'Покупка'
+    purchase: 'Покупка',
+    refund: 'Возврат'
   }
   return labels[type] || type
 }
@@ -115,6 +119,34 @@ async function submitTransfer() {
   }
 }
 
+async function submitProduct() {
+  if (!canSubmitProduct.value || isSavingProduct.value) return
+  errorMessage.value = ''
+  successMessage.value = ''
+  isSavingProduct.value = true
+  try {
+    await createProduct({
+      name: productForm.name.trim(),
+      description: productForm.description.trim(),
+      price: Number(productForm.price),
+      stock: Number(productForm.stock),
+      imageUrl: productForm.imageUrl.trim() || null,
+      isActive: true
+    })
+    productForm.name = ''
+    productForm.description = ''
+    productForm.price = ''
+    productForm.stock = ''
+    productForm.imageUrl = ''
+    successMessage.value = 'Товар добавлен в каталог'
+    await load()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось добавить товар'
+  } finally {
+    isSavingProduct.value = false
+  }
+}
+
 async function loadVolunteerOptions(params: { search: string; page: number; perPage: number }) {
   const response = await fetchVolunteers({ search: params.search })
   const ownId = authState.user?.id
@@ -126,9 +158,19 @@ async function loadVolunteerOptions(params: { search: string; page: number; perP
 }
 
 async function updateOrderStatus(order: ShopOrder, status: string) {
-  const response = await updateShopOrderStatus(order.id, status)
-  const index = allOrders.value.findIndex((item) => item.id === order.id)
-  if (index >= 0) allOrders.value[index] = response.item
+  errorMessage.value = ''
+  successMessage.value = ''
+  try {
+    const response = await updateShopOrderStatus(order.id, status)
+    const index = allOrders.value.findIndex((item) => item.id === order.id)
+    if (index >= 0) allOrders.value[index] = response.item
+    const ownIndex = orders.value.findIndex((item) => item.id === order.id)
+    if (ownIndex >= 0) orders.value[ownIndex] = response.item
+    successMessage.value = 'Статус заказа обновлен'
+    await load()
+  } catch (error) {
+    errorMessage.value = error instanceof Error ? error.message : 'Не удалось обновить статус заказа'
+  }
 }
 
 onMounted(load)
@@ -152,6 +194,7 @@ onMounted(load)
       <button :class="{ active: activeTab === 'products' }" type="button" @click="activeTab = 'products'"><Gift :size="17" />Товары</button>
       <button :class="{ active: activeTab === 'orders' }" type="button" @click="activeTab = 'orders'"><ShoppingCart :size="17" />Мои заказы</button>
       <button v-if="isManager" :class="{ active: activeTab === 'manage' }" type="button" @click="activeTab = 'manage'"><PackageCheck :size="17" />Обработка</button>
+      <button v-if="isManager" :class="{ active: activeTab === 'catalog' }" type="button" @click="activeTab = 'catalog'"><PackagePlus :size="17" />Каталог</button>
     </nav>
 
     <div v-if="isLoading" class="empty-state">Загрузка магазина...</div>
@@ -219,7 +262,7 @@ onMounted(load)
       <PaginationBar v-model:page="orderPage" :per-page="orderPerPage" :total="orders.length" />
     </div>
 
-    <div v-else class="shop-orders">
+    <div v-else-if="activeTab === 'manage'" class="shop-orders">
       <article v-for="order in managePageItems" :key="order.id" class="detail-panel shop-order-card manager-order-card">
         <header><div><span class="status-pill">{{ statusLabel(order.status) }}</span><strong>{{ order.userName }}</strong></div><strong>{{ order.total }} монет</strong></header>
         <p>{{ order.items.map((item) => `${item.productName} × ${item.quantity}`).join(', ') }}</p>
@@ -228,6 +271,39 @@ onMounted(load)
       </article>
       <p v-if="!allOrders.length" class="empty-state">Заказов на обработку нет.</p>
       <PaginationBar v-model:page="managePage" :per-page="managePerPage" :total="allOrders.length" />
+    </div>
+
+    <div v-else-if="activeTab === 'catalog'" class="shop-layout">
+      <form class="detail-panel settings-form settings-form-grid" @submit.prevent="submitProduct">
+        <div class="section-heading settings-form-wide">
+          <div><p class="eyebrow">Каталог</p><h2>Новый товар</h2></div>
+          <PackagePlus :size="20" />
+        </div>
+        <label><span>Название</span><input v-model="productForm.name" required /></label>
+        <label><span>Цена в монетах</span><input v-model="productForm.price" type="number" min="1" required /></label>
+        <label><span>Остаток</span><input v-model="productForm.stock" type="number" min="0" required /></label>
+        <label class="settings-form-wide"><span>Ссылка на картинку</span><input v-model="productForm.imageUrl" type="url" placeholder="https://..." /></label>
+        <label class="settings-form-wide"><span>Описание</span><textarea v-model="productForm.description" rows="4"></textarea></label>
+        <div class="form-actions settings-form-wide">
+          <button class="primary-action" type="submit" :disabled="!canSubmitProduct || isSavingProduct">
+            <PackagePlus :size="17" />Добавить товар
+          </button>
+        </div>
+      </form>
+
+      <aside class="detail-panel cart-panel">
+        <div class="section-heading">
+          <div><p class="eyebrow">Витрина</p><h2>Текущие товары</h2></div>
+          <Gift :size="20" />
+        </div>
+        <div class="cart-list">
+          <div v-for="product in products.slice(0, 6)" :key="product.id">
+            <span>{{ product.name }}</span>
+            <strong>{{ product.price }} · {{ product.stock }} шт.</strong>
+          </div>
+          <p v-if="!products.length" class="muted-text">Каталог пока пустой.</p>
+        </div>
+      </aside>
     </div>
   </section>
 </template>

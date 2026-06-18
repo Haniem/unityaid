@@ -264,6 +264,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	shopGroup.GET("/wallet", shopHandler.Wallet)
 	shopGroup.POST("/wallet/transfers", shopHandler.Transfer)
 	shopGroup.GET("/products", shopHandler.Products)
+	shopGroup.POST("/products", shopHandler.CreateProduct)
 	shopGroup.GET("/orders", shopHandler.Orders)
 	shopGroup.POST("/orders", shopHandler.CreateOrder)
 	shopGroup.PATCH("/orders/:id", shopHandler.UpdateOrderStatus)

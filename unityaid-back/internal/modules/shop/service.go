@@ -22,6 +22,10 @@ func (s *Service) Products(ctx context.Context) ([]Product, error) {
 	return s.repository.Products(ctx)
 }
 
+func (s *Service) CreateProduct(ctx context.Context, req CreateProductRequest) (Product, error) {
+	return s.repository.CreateProduct(ctx, req)
+}
+
 func (s *Service) CreateOrder(ctx context.Context, userID string, req CreateOrderRequest) (Order, error) {
 	return s.repository.CreateOrder(ctx, userID, req)
 }

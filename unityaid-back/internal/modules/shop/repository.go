@@ -11,6 +11,8 @@ import (
 var ErrInsufficientCoins = errors.New("insufficient coins")
 var ErrOutOfStock = errors.New("product out of stock")
 var ErrNotFound = errors.New("not found")
+var ErrInvalidStatus = errors.New("invalid status")
+var ErrInvalidStatusTransition = errors.New("invalid status transition")
 
 type Repository struct {
 	db *pgxpool.Pool
@@ -107,6 +109,18 @@ func (r *Repository) Products(ctx context.Context) ([]Product, error) {
 		items = append(items, item)
 	}
 	return items, rows.Err()
+}
+
+func (r *Repository) CreateProduct(ctx context.Context, req CreateProductRequest) (Product, error) {
+	isActive := true
+	if req.IsActive != nil {
+		isActive = *req.IsActive
+	}
+	return scanProduct(r.db.QueryRow(ctx, `
+		INSERT INTO shop_products (organization_id, name, description, price, stock, image_url, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING id::text, organization_id::text, NULL::text, name, description, price, stock, image_url, is_active, created_at, updated_at
+	`, req.OrganizationID, req.Name, req.Description, req.Price, req.Stock, req.ImageURL, isActive))
 }
 
 func (r *Repository) CreateOrder(ctx context.Context, userID string, req CreateOrderRequest) (Order, error) {
@@ -241,7 +255,56 @@ func (r *Repository) Order(ctx context.Context, id string) (Order, error) {
 }
 
 func (r *Repository) UpdateOrderStatus(ctx context.Context, id string, status string, managerID string) (Order, error) {
-	tag, err := r.db.Exec(ctx, `
+	if !isAllowedOrderStatus(status) {
+		return Order{}, ErrInvalidStatus
+	}
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return Order{}, err
+	}
+	defer tx.Rollback(ctx)
+
+	var userID, currentStatus string
+	var total int
+	if err := tx.QueryRow(ctx, `
+		SELECT user_id::text, status, total
+		FROM shop_orders
+		WHERE id = $1
+		FOR UPDATE
+	`, id).Scan(&userID, &currentStatus, &total); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return Order{}, ErrNotFound
+		}
+		return Order{}, err
+	}
+	if currentStatus == "cancelled" && status != "cancelled" {
+		return Order{}, ErrInvalidStatusTransition
+	}
+	if status == "cancelled" && currentStatus != "cancelled" {
+		if _, err := tx.Exec(ctx, `
+			UPDATE volunteer_profiles
+			SET coin_balance = coin_balance + $2, updated_at = now()
+			WHERE user_id = $1
+		`, userID, total); err != nil {
+			return Order{}, err
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE shop_products product
+			SET stock = product.stock + item.quantity, updated_at = now()
+			FROM shop_order_items item
+			WHERE item.order_id = $1 AND item.product_id = product.id
+		`, id); err != nil {
+			return Order{}, err
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO coin_transactions (user_id, amount, type, description, source_type, source_id)
+			VALUES ($1, $2, 'refund', 'Возврат за отмененный заказ', 'shop_order', $3)
+		`, userID, total, id); err != nil {
+			return Order{}, err
+		}
+	}
+
+	tag, err := tx.Exec(ctx, `
 		UPDATE shop_orders
 		SET status = $2, processed_by = $3, processed_at = now(), updated_at = now()
 		WHERE id = $1
@@ -252,7 +315,19 @@ func (r *Repository) UpdateOrderStatus(ctx context.Context, id string, status st
 	if tag.RowsAffected() == 0 {
 		return Order{}, ErrNotFound
 	}
+	if err := tx.Commit(ctx); err != nil {
+		return Order{}, err
+	}
 	return r.Order(ctx, id)
+}
+
+func isAllowedOrderStatus(status string) bool {
+	switch status {
+	case "pending", "processing", "completed", "cancelled":
+		return true
+	default:
+		return false
+	}
 }
 
 func (r *Repository) orderItems(ctx context.Context, orderID string) ([]OrderItem, error) {

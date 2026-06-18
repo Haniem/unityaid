@@ -27,6 +27,16 @@ export type Product = {
   updatedAt: string
 }
 
+export type CreateProductPayload = {
+  organizationId?: string | null
+  name: string
+  description: string
+  price: number
+  stock: number
+  imageUrl?: string | null
+  isActive?: boolean
+}
+
 export type OrderItem = {
   id: string
   productId?: string | null
