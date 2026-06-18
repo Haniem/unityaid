@@ -67,6 +67,40 @@ func (r *Repository) TotalHours(ctx context.Context, userID string, organization
 	return hours, err
 }
 
+func (r *Repository) ParticipationEvents(ctx context.Context, userID string, organizationID *string) ([]ParticipationEvent, error) {
+	rows, err := r.db.Query(ctx, `
+		SELECT DISTINCT e.id::text, e.title, o.name, e.starts_at, e.ends_at, e.location
+		FROM event_applications ea
+		JOIN events e ON e.id = ea.event_id
+		LEFT JOIN organizations o ON o.id = e.organization_id
+		LEFT JOIN event_attendance att ON att.event_id = e.id AND att.user_id = ea.user_id
+		WHERE ea.user_id = $1
+			AND (ea.status = 'approved' OR att.id IS NOT NULL)
+			AND ($2::uuid IS NULL OR e.organization_id = $2::uuid)
+		ORDER BY e.starts_at DESC
+	`, userID, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ParticipationEvent{}
+	for rows.Next() {
+		var item ParticipationEvent
+		var organizationName, location sql.NullString
+		if err := rows.Scan(&item.ID, &item.Title, &organizationName, &item.StartsAt, &item.EndsAt, &location); err != nil {
+			return nil, err
+		}
+		if organizationName.Valid {
+			item.OrganizationName = &organizationName.String
+		}
+		if location.Valid {
+			item.Location = &location.String
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 func (r *Repository) Create(ctx context.Context, request GenerateRequest, totalHours float64, verifyCode string, issuedBy string) (Certificate, error) {
 	var id string
 	err := r.db.QueryRow(ctx, `

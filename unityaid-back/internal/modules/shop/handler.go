@@ -49,7 +49,13 @@ func (h *Handler) Transfer(c *gin.Context) {
 }
 
 func (h *Handler) Products(c *gin.Context) {
-	items, err := h.service.Products(c.Request.Context())
+	claims, _ := auth.GetClaims(c)
+	organizationIDs, err := h.authorizer.AccessibleOrganizationIDs(c.Request.Context(), claims)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not check permissions"})
+		return
+	}
+	items, err := h.service.Products(c.Request.Context(), organizationIDs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not load products"})
 		return
@@ -59,16 +65,6 @@ func (h *Handler) Products(c *gin.Context) {
 
 func (h *Handler) CreateProduct(c *gin.Context) {
 	claims, _ := auth.GetClaims(c)
-	allowed, err := h.authorizer.CanManageAnyContent(c.Request.Context(), claims)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not check permissions"})
-		return
-	}
-	if !allowed {
-		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden", "message": "Insufficient permissions"})
-		return
-	}
-
 	var request CreateProductRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
@@ -95,26 +91,18 @@ func (h *Handler) CreateProduct(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Название товара обязательно"})
 		return
 	}
-	if request.OrganizationID == nil {
-		isSuperAdmin, err := h.authorizer.IsSuperAdmin(c.Request.Context(), claims)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not check permissions"})
-			return
-		}
-		if !isSuperAdmin {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Укажите организацию товара"})
-			return
-		}
-	} else {
-		allowed, err := h.authorizer.CanManageContent(c.Request.Context(), claims, *request.OrganizationID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not check permissions"})
-			return
-		}
-		if !allowed {
-			c.JSON(http.StatusForbidden, gin.H{"error": "forbidden", "message": "Insufficient permissions"})
-			return
-		}
+	if request.OrganizationID == nil || *request.OrganizationID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": "Укажите организацию товара"})
+		return
+	}
+	allowed, err := h.authorizer.CanManageContent(c.Request.Context(), claims, *request.OrganizationID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not check permissions"})
+		return
+	}
+	if !allowed {
+		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden", "message": "Insufficient permissions"})
+		return
 	}
 
 	item, err := h.service.CreateProduct(c.Request.Context(), request)
@@ -132,13 +120,26 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})
 		return
 	}
-	item, err := h.service.CreateOrder(c.Request.Context(), claims.UserID, request)
+	organizationIDs, err := h.authorizer.AccessibleOrganizationIDs(c.Request.Context(), claims)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not check permissions"})
+		return
+	}
+	item, err := h.service.CreateOrder(c.Request.Context(), claims.UserID, organizationIDs, request)
 	if errors.Is(err, ErrInsufficientCoins) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "insufficient_coins", "message": "Недостаточно монет"})
 		return
 	}
 	if errors.Is(err, ErrOutOfStock) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "out_of_stock", "message": "Товара недостаточно на складе"})
+		return
+	}
+	if errors.Is(err, ErrMixedOrganizations) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "mixed_organizations", "message": "Товары в корзине должны относиться к одной организации"})
+		return
+	}
+	if errors.Is(err, ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Product not found"})
 		return
 	}
 	if err != nil {
@@ -151,6 +152,7 @@ func (h *Handler) CreateOrder(c *gin.Context) {
 func (h *Handler) Orders(c *gin.Context) {
 	claims, _ := auth.GetClaims(c)
 	all := false
+	var organizationIDs []string
 	if c.Query("scope") == "all" {
 		allowed, err := h.authorizer.CanManageAnyContent(c.Request.Context(), claims)
 		if err != nil {
@@ -158,8 +160,15 @@ func (h *Handler) Orders(c *gin.Context) {
 			return
 		}
 		all = allowed
+		if all {
+			organizationIDs, err = h.authorizer.ManageableOrganizationIDs(c.Request.Context(), claims)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not check permissions"})
+				return
+			}
+		}
 	}
-	items, err := h.service.Orders(c.Request.Context(), claims.UserID, all)
+	items, err := h.service.Orders(c.Request.Context(), claims.UserID, all, organizationIDs)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not load orders"})
 		return
@@ -169,7 +178,21 @@ func (h *Handler) Orders(c *gin.Context) {
 
 func (h *Handler) UpdateOrderStatus(c *gin.Context) {
 	claims, _ := auth.GetClaims(c)
-	allowed, err := h.authorizer.CanManageAnyContent(c.Request.Context(), claims)
+	order, err := h.service.Order(c.Request.Context(), c.Param("id"))
+	if errors.Is(err, ErrNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "not_found", "message": "Order not found"})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not load order"})
+		return
+	}
+	allowed := false
+	if order.OrganizationID == nil {
+		allowed, err = h.authorizer.IsSuperAdmin(c.Request.Context(), claims)
+	} else {
+		allowed, err = h.authorizer.CanManageContent(c.Request.Context(), claims, *order.OrganizationID)
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "internal_error", "message": "Could not check permissions"})
 		return
@@ -178,6 +201,7 @@ func (h *Handler) UpdateOrderStatus(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "forbidden", "message": "Insufficient permissions"})
 		return
 	}
+
 	var request UpdateOrderStatusRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid_request", "message": err.Error()})

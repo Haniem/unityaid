@@ -13,6 +13,7 @@ var ErrOutOfStock = errors.New("product out of stock")
 var ErrNotFound = errors.New("not found")
 var ErrInvalidStatus = errors.New("invalid status")
 var ErrInvalidStatusTransition = errors.New("invalid status transition")
+var ErrMixedOrganizations = errors.New("cart contains products from different organizations")
 
 type Repository struct {
 	db *pgxpool.Pool
@@ -88,14 +89,24 @@ func (r *Repository) Transfer(ctx context.Context, fromUserID string, req Transf
 	return r.Wallet(ctx, fromUserID)
 }
 
-func (r *Repository) Products(ctx context.Context) ([]Product, error) {
+func (r *Repository) Products(ctx context.Context, organizationIDs []string) ([]Product, error) {
+	if organizationIDs != nil && len(organizationIDs) == 0 {
+		return []Product{}, nil
+	}
+	showAll := organizationIDs == nil
+	organizationIDsArg := organizationIDs
+	if organizationIDsArg == nil {
+		organizationIDsArg = []string{}
+	}
 	rows, err := r.db.Query(ctx, `
 		SELECT p.id::text, p.organization_id::text, o.name, p.name, p.description, p.price, p.stock, p.image_url, p.is_active, p.created_at, p.updated_at
 		FROM shop_products p
 		LEFT JOIN organizations o ON o.id = p.organization_id
 		WHERE p.is_active = true
+			AND p.organization_id IS NOT NULL
+			AND ($1::bool OR p.organization_id::text = ANY($2::text[]))
 		ORDER BY p.price, p.name
-	`)
+	`, showAll, organizationIDsArg)
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +134,10 @@ func (r *Repository) CreateProduct(ctx context.Context, req CreateProductRequest
 	`, req.OrganizationID, req.Name, req.Description, req.Price, req.Stock, req.ImageURL, isActive))
 }
 
-func (r *Repository) CreateOrder(ctx context.Context, userID string, req CreateOrderRequest) (Order, error) {
+func (r *Repository) CreateOrder(ctx context.Context, userID string, organizationIDs []string, req CreateOrderRequest) (Order, error) {
+	if organizationIDs != nil && len(organizationIDs) == 0 {
+		return Order{}, ErrNotFound
+	}
 	tx, err := r.db.Begin(ctx)
 	if err != nil {
 		return Order{}, err
@@ -135,6 +149,11 @@ func (r *Repository) CreateOrder(ctx context.Context, userID string, req CreateO
 		return Order{}, err
 	}
 	total := 0
+	showAll := organizationIDs == nil
+	organizationIDsArg := organizationIDs
+	if organizationIDsArg == nil {
+		organizationIDsArg = []string{}
+	}
 	type productSnapshot struct {
 		id, name string
 		orgID    *string
@@ -148,9 +167,12 @@ func (r *Repository) CreateOrder(ctx context.Context, userID string, req CreateO
 		if err := tx.QueryRow(ctx, `
 			SELECT id::text, organization_id::text, name, price, stock
 			FROM shop_products
-			WHERE id = $1 AND is_active = true
+			WHERE id = $1
+				AND is_active = true
+				AND organization_id IS NOT NULL
+				AND ($2::bool OR organization_id::text = ANY($3::text[]))
 			FOR UPDATE
-		`, requested.ProductID).Scan(&product.id, &orgID, &product.name, &product.price, &product.quantity); err != nil {
+		`, requested.ProductID, showAll, organizationIDsArg).Scan(&product.id, &orgID, &product.name, &product.price, &product.quantity); err != nil {
 			if errors.Is(err, pgx.ErrNoRows) {
 				return Order{}, ErrNotFound
 			}
@@ -161,6 +183,9 @@ func (r *Repository) CreateOrder(ctx context.Context, userID string, req CreateO
 		}
 		product.orgID = orgID
 		product.quantity = requested.Quantity
+		if len(products) > 0 && (products[0].orgID == nil || product.orgID == nil || *products[0].orgID != *product.orgID) {
+			return Order{}, ErrMixedOrganizations
+		}
 		total += product.price * requested.Quantity
 		products = append(products, product)
 	}
@@ -206,7 +231,10 @@ func (r *Repository) CreateOrder(ctx context.Context, userID string, req CreateO
 	return r.Order(ctx, orderID)
 }
 
-func (r *Repository) Orders(ctx context.Context, userID string, all bool) ([]Order, error) {
+func (r *Repository) Orders(ctx context.Context, userID string, all bool, organizationIDs []string) ([]Order, error) {
+	if all && organizationIDs != nil && len(organizationIDs) == 0 {
+		return []Order{}, nil
+	}
 	sql := `
 		SELECT o.id::text, o.user_id::text, concat_ws(' ', u.last_name, u.first_name), o.organization_id::text, org.name, o.status, o.total, o.comment, o.created_at, o.updated_at
 		FROM shop_orders o
@@ -217,6 +245,9 @@ func (r *Repository) Orders(ctx context.Context, userID string, all bool) ([]Ord
 	if !all {
 		sql += ` WHERE o.user_id = $1`
 		args = append(args, userID)
+	} else if organizationIDs != nil {
+		sql += ` WHERE o.organization_id::text = ANY($1::text[])`
+		args = append(args, organizationIDs)
 	}
 	sql += ` ORDER BY o.created_at DESC`
 	rows, err := r.db.Query(ctx, sql, args...)

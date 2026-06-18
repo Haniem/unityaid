@@ -39,6 +39,7 @@ const tasks = ref<TaskItem[]>([])
 const feedbackAverage = ref(0)
 const feedbackCount = ref(0)
 const attendanceHours = ref<Record<string, string>>({})
+const applicationRejectionReasons = reactive<Record<string, string>>({})
 const selectedApplicationIds = ref<string[]>([])
 const selectedAttendanceUserIds = ref<string[]>([])
 const bulkRejectionReason = ref('')
@@ -55,14 +56,6 @@ const feedbackForm = reactive({ rating: 5, comment: '' })
 const taskFilters = reactive({ startsAt: '', endsAt: '', location: '', status: '' })
 const { page: applicationsPage, perPage: applicationsPerPage, pageItems: applicationsPageItems } = useClientPagination(applications, 8)
 const { page: attendancePage, perPage: attendancePerPage, pageItems: attendancePageItems } = useClientPagination(attendance, 8)
-
-const applicationStatusOptions = [
-  { id: 'pending', name: 'На рассмотрении' },
-  { id: 'approved', name: 'Подтверждена' },
-  { id: 'waitlisted', name: 'Лист ожидания' },
-  { id: 'rejected', name: 'Отклонена' },
-  { id: 'cancelled', name: 'Отменена' }
-]
 
 const currentUserId = computed(() => authState.user?.id ?? '')
 const canManageEvent = computed(() => {
@@ -194,10 +187,12 @@ async function cancelApplication() {
   successMessage.value = 'Заявка отменена'
 }
 
-async function setApplicationStatus(app: EventApplication, status: EventApplication['status']) {
-  const response = await updateEventApplication(eventId, app.id, status)
+async function setApplicationStatus(app: EventApplication, status: EventApplication['status'], rejectionReason = '') {
+  const response = await updateEventApplication(eventId, app.id, status, rejectionReason)
   const index = applications.value.findIndex((entry) => entry.id === app.id)
   if (index >= 0) applications.value[index] = response.item
+  applicationRejectionReasons[app.id] = ''
+  successMessage.value = `Статус заявки обновлен: ${applicationStatusLabels[response.item.status]}`
 }
 
 async function bulkSetApplicationStatus(status: EventApplication['status']) {
@@ -394,7 +389,7 @@ onMounted(load)
           </div>
           <p v-if="successMessage" class="form-success">{{ successMessage }}</p>
 
-          <div v-if="canManageEvent" class="context-toolbar">
+          <div v-if="canManageEvent" class="context-toolbar application-actions-panel">
             <button class="secondary-action" type="button" :disabled="selectedApplicationIds.length === 0" @click="bulkSetApplicationStatus('approved')">
               Подтвердить выбранные заявки
             </button>
@@ -403,15 +398,30 @@ onMounted(load)
               Отклонить выбранные заявки
             </button>
           </div>
-          <article v-for="app in applicationsPageItems" :key="app.id" class="member-row application-row">
-            <input v-if="canManageEvent" v-model="selectedApplicationIds" type="checkbox" :value="app.id" aria-label="Выбрать заявку" />
-            <div>
-              <strong>{{ app.userName }}</strong>
-              <small>{{ app.email }} · {{ app.message || 'без комментария' }}</small>
+          <article v-for="app in applicationsPageItems" :key="app.id" class="application-card">
+            <label v-if="canManageEvent" class="application-check">
+              <input v-model="selectedApplicationIds" type="checkbox" :value="app.id" aria-label="Выбрать заявку" />
+            </label>
+            <div class="application-card-main">
+              <div class="application-card-head">
+                <div>
+                  <strong>{{ app.userName }}</strong>
+                  <small>{{ app.email }}</small>
+                </div>
+                <span class="status-pill">{{ applicationStatusLabels[app.status] }}</span>
+              </div>
+              <p>{{ app.message || 'Без комментария' }}</p>
               <small v-if="app.rejectionReason">Причина: {{ app.rejectionReason }}</small>
             </div>
-            <span class="status-pill">{{ applicationStatusLabels[app.status] }}</span>
-            <CustomSelect v-if="canManageEvent" :model-value="app.status" :options="applicationStatusOptions" @update:model-value="setApplicationStatus(app, $event as EventApplication['status'])" />
+            <div v-if="canManageEvent" class="application-card-actions">
+              <button class="secondary-action compact-action" type="button" :disabled="app.status === 'approved'" @click="setApplicationStatus(app, 'approved')">
+                Подтвердить
+              </button>
+              <input v-model="applicationRejectionReasons[app.id]" placeholder="Причина отказа" />
+              <button class="secondary-action danger-action compact-action" type="button" :disabled="app.status === 'rejected'" @click="setApplicationStatus(app, 'rejected', applicationRejectionReasons[app.id] || '')">
+                Отклонить
+              </button>
+            </div>
           </article>
           <PaginationBar v-model:page="applicationsPage" :per-page="applicationsPerPage" :total="applications.length" />
           <p v-if="applications.length === 0" class="empty-state">Заявок пока нет.</p>
@@ -476,11 +486,12 @@ onMounted(load)
           <label class="filter-select"><span>Место</span><input v-model="taskFilters.location" placeholder="Место проведения" /></label>
           <label class="filter-select"><span>Статус</span><CustomSelect v-model="taskFilters.status" :options="taskStatusOptions" /></label>
         </div>
-        <div class="member-list">
-          <article v-for="task in filteredEventTasks" :key="task.id" class="member-row linked-row">
-            <div>
-              <RouterLink :to="`/tasks/${task.id}`"><strong>{{ task.title }}</strong></RouterLink>
-              <small>{{ task.dueAt ? formatDateTime(task.dueAt) : 'Срок не указан' }} · {{ task.assignees.map((assignee) => assignee.name).join(', ') || 'исполнители не назначены' }}</small>
+        <div class="event-task-list">
+          <article v-for="task in filteredEventTasks" :key="task.id" class="event-task-card">
+            <div class="event-task-card-main">
+              <RouterLink :to="`/tasks/${task.id}`">{{ task.title }}</RouterLink>
+              <small>{{ task.dueAt ? formatDateTime(task.dueAt) : 'Срок не указан' }}</small>
+              <small>{{ task.assignees.map((assignee) => assignee.name).join(', ') || 'Исполнители не назначены' }}</small>
             </div>
             <span class="status-pill">{{ taskStatusLabels[task.status] || task.status }}</span>
           </article>

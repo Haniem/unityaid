@@ -47,6 +47,12 @@ func (s *Service) PDF(ctx context.Context, id string) ([]byte, Certificate, erro
 	if err != nil {
 		return nil, Certificate{}, err
 	}
+	if item.Type == "participation" {
+		item.Events, err = s.repository.ParticipationEvents(ctx, item.UserID, item.OrganizationID)
+		if err != nil {
+			return nil, Certificate{}, err
+		}
+	}
 	return BuildPDF(item), item, nil
 }
 

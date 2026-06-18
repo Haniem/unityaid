@@ -21,7 +21,6 @@ import {
   Network,
   Newspaper,
   Plus,
-  Search,
   Settings,
   UserRound,
   UsersRound,
@@ -230,10 +229,6 @@ onBeforeUnmount(() => {
         </span>
       </RouterLink>
 
-      <div class="topbar-search">
-        <Search :size="18" />
-        <input type="search" placeholder="Поиск" aria-label="Поиск" />
-      </div>
     </div>
 
     <div class="topbar-actions">

@@ -63,6 +63,18 @@ func (a *Authorizer) ManageableOrganizationIDs(ctx context.Context, claims Claim
 	return a.repository.OrganizationIDsForRoles(ctx, claims.UserID, "org_admin", "coordinator")
 }
 
+func (a *Authorizer) AccessibleOrganizationIDs(ctx context.Context, claims Claims) ([]string, error) {
+	if ok, err := a.IsSuperAdmin(ctx, claims); ok || err != nil {
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			return nil, nil
+		}
+	}
+	return a.repository.OrganizationIDsForRoles(ctx, claims.UserID, "super_admin", "org_admin", "coordinator", "volunteer")
+}
+
 func (a *Authorizer) CanManageUsers(ctx context.Context, claims Claims) (bool, error) {
 	return a.IsSuperAdmin(ctx, claims)
 }

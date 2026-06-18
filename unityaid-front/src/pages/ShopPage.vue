@@ -5,6 +5,7 @@ import { createProduct, createShopOrder, fetchProducts, fetchShopOrders, fetchWa
 import type { Product, ShopOrder, Wallet } from '../entities/shop/types'
 import { authState } from '../entities/auth/store'
 import { fetchVolunteers } from '../entities/users/api'
+import { fetchOrganizations } from '../entities/organizations/api'
 import type { PossibleValue } from '../entities/forms/types'
 import AsyncSelect from '../shared/ui/AsyncSelect.vue'
 import CustomSelect from '../shared/ui/CustomSelect.vue'
@@ -22,19 +23,21 @@ const errorMessage = ref('')
 const successMessage = ref('')
 const isLoading = ref(true)
 const isSavingProduct = ref(false)
+const organizationOptions = ref<PossibleValue[]>([])
 const cart = reactive<Record<string, number>>({})
 const checkoutComment = ref('')
 const transfer = reactive({ recipientId: '', amount: '', comment: '' })
-const productForm = reactive({ name: '', description: '', price: '', stock: '', imageUrl: '' })
+const productForm = reactive({ organizationId: '', name: '', description: '', price: '', stock: '', imageUrl: '' })
 const { page: productPage, perPage: productPerPage, pageItems: productPageItems } = useClientPagination(products, 8)
 const { page: orderPage, perPage: orderPerPage, pageItems: orderPageItems } = useClientPagination(orders, 8)
 const { page: managePage, perPage: managePerPage, pageItems: managePageItems } = useClientPagination(allOrders, 8)
 
-const isManager = computed(() => ['super_admin', 'org_admin', 'coordinator'].includes(authState.user?.primaryRole ?? ''))
+const isSystemAdmin = computed(() => Boolean(authState.user?.systemRoles?.some((role) => role.code === 'system_admin') || authState.user?.primaryRole === 'super_admin'))
+const isManager = computed(() => isSystemAdmin.value || Boolean(authState.user?.organizations.some((membership) => ['org_admin', 'coordinator'].includes(membership.role))))
 const cartItems = computed(() => products.value.filter((product) => (cart[product.id] ?? 0) > 0).map((product) => ({ product, quantity: cart[product.id] })))
 const cartTotal = computed(() => cartItems.value.reduce((sum, item) => sum + item.product.price * item.quantity, 0))
 const canCheckout = computed(() => cartItems.value.length > 0 && (wallet.value?.balance ?? 0) >= cartTotal.value)
-const canSubmitProduct = computed(() => productForm.name.trim().length > 0 && Number(productForm.price) > 0 && productForm.stock !== '' && Number(productForm.stock) >= 0)
+const canSubmitProduct = computed(() => productForm.organizationId && productForm.name.trim().length > 0 && Number(productForm.price) > 0 && productForm.stock !== '' && Number(productForm.stock) >= 0)
 const orderStatusOptions = [
   { id: 'pending', name: 'Новый' },
   { id: 'processing', name: 'В обработке' },
@@ -68,6 +71,7 @@ async function load() {
   isLoading.value = true
   errorMessage.value = ''
   try {
+    if (isManager.value) await loadOrganizationOptions()
     const [walletResponse, productsResponse, ordersResponse, allOrdersResponse] = await Promise.all([
       fetchWallet(),
       fetchProducts(),
@@ -82,6 +86,19 @@ async function load() {
     errorMessage.value = error instanceof Error ? error.message : 'Не удалось загрузить магазин'
   } finally {
     isLoading.value = false
+  }
+}
+
+async function loadOrganizationOptions() {
+  if (isSystemAdmin.value) {
+    organizationOptions.value = (await fetchOrganizations()).items.map((organization) => ({ id: organization.id, name: organization.name }))
+  } else {
+    organizationOptions.value = (authState.user?.organizations ?? [])
+      .filter((membership) => ['org_admin', 'coordinator'].includes(membership.role))
+      .map((membership) => ({ id: membership.organizationId, name: membership.organizationName }))
+  }
+  if (!productForm.organizationId && organizationOptions.value.length > 0) {
+    productForm.organizationId = organizationOptions.value[0].id
   }
 }
 
@@ -126,6 +143,7 @@ async function submitProduct() {
   isSavingProduct.value = true
   try {
     await createProduct({
+      organizationId: productForm.organizationId,
       name: productForm.name.trim(),
       description: productForm.description.trim(),
       price: Number(productForm.price),
@@ -133,6 +151,7 @@ async function submitProduct() {
       imageUrl: productForm.imageUrl.trim() || null,
       isActive: true
     })
+    productForm.organizationId = organizationOptions.value[0]?.id ?? ''
     productForm.name = ''
     productForm.description = ''
     productForm.price = ''
@@ -279,6 +298,7 @@ onMounted(load)
           <div><p class="eyebrow">Каталог</p><h2>Новый товар</h2></div>
           <PackagePlus :size="20" />
         </div>
+        <label class="settings-form-wide"><span>Организация</span><CustomSelect v-model="productForm.organizationId" :options="organizationOptions" placeholder="Выберите организацию" /></label>
         <label><span>Название</span><input v-model="productForm.name" required /></label>
         <label><span>Цена в монетах</span><input v-model="productForm.price" type="number" min="1" required /></label>
         <label><span>Остаток</span><input v-model="productForm.stock" type="number" min="0" required /></label>
