@@ -65,7 +65,7 @@ const reports = [
 ]
 
 const managementReports = [
-  { code: 'executive', title: '?????? ????????????', description: 'Сводка для руководителя по ключевым показателям и рискам.', icon: BarChart3, to: '/analytics/executive' },
+  { code: 'executive', title: 'Панель руководителя', description: 'Сводка для руководителя по ключевым показателям и рискам.', icon: BarChart3, to: '/analytics/executive' },
   { code: 'management', title: 'Для руководства', description: 'Динамика заявок и операционные показатели периода.', icon: ClipboardList, to: '/analytics/management' },
   { code: 'grant', title: 'Для грантодателя', description: 'Подтвержденные часы и вклад организаций.', icon: Award, to: '/analytics/grant' },
   { code: 'branches', title: 'Филиалы', description: 'Активность филиалов, мероприятий и задач.', icon: CalendarDays, to: '/analytics/branches' },

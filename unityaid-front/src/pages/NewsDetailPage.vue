@@ -1,15 +1,18 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Pencil, Trash2 } from 'lucide-vue-next'
 import { deleteNews, fetchNewsItem } from '../entities/news/api'
 import type { NewsItem } from '../entities/news/types'
+import { authState } from '../entities/auth/store'
+import { canManageContent } from '../shared/permissions'
 
 const route = useRoute()
 const router = useRouter()
 const item = ref<NewsItem | null>(null)
 const isLoading = ref(true)
 const errorMessage = ref('')
+const canManageNews = computed(() => canManageContent(authState.user))
 
 async function loadNews() {
   isLoading.value = true
@@ -24,6 +27,7 @@ async function loadNews() {
 }
 
 async function removeNews() {
+  if (!canManageNews.value) return
   if (!item.value || !confirm(`Удалить новость "${item.value.title}"?`)) {
     return
   }
@@ -52,7 +56,7 @@ onMounted(loadNews)
           <p class="eyebrow">{{ item.organizationName || 'Новости' }}</p>
           <h1>{{ item.title }}</h1>
         </div>
-        <div class="page-actions">
+        <div v-if="canManageNews" class="page-actions">
           <RouterLink class="secondary-action" :to="`/news/${item.id}/edit`">
             <Pencil :size="17" />
             <span>Редактировать</span>

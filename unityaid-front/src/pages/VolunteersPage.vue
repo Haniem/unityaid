@@ -14,6 +14,8 @@ import CustomSelect from '../shared/ui/CustomSelect.vue'
 import PaginationBar from '../shared/ui/PaginationBar.vue'
 import { modelFromForm, nullable, stringValue } from '../shared/forms'
 import { useClientPagination } from '../shared/pagination'
+import { authState } from '../entities/auth/store'
+import { canManageContent } from '../shared/permissions'
 
 const volunteers = ref<VolunteerProfile[]>([])
 const skills = ref<Skill[]>([])
@@ -39,6 +41,7 @@ const importError = ref('')
 const importMessage = ref('')
 const isImporting = ref(false)
 const { page, perPage, pageItems } = useClientPagination(volunteers, 12)
+const canManageVolunteers = computed(() => canManageContent(authState.user))
 
 const totalHours = computed(() => volunteers.value.reduce((sum, item) => sum + item.totalHours, 0))
 const averageLevel = computed(() => {
@@ -51,6 +54,7 @@ function initials(firstName?: string, lastName?: string) {
 }
 
 async function openEditModal(item: VolunteerProfile) {
+  if (!canManageVolunteers.value) return
   editing.value = item
   formSchema.value = await fetchEditForm('volunteers', item.userId)
   formModel.value = modelFromForm(formSchema.value)
@@ -84,7 +88,7 @@ async function load() {
 }
 
 async function submit() {
-  if (!editing.value) return
+  if (!editing.value || !canManageVolunteers.value) return
   errorMessage.value = ''
   try {
     const response = await updateVolunteer(editing.value.userId, {
@@ -108,6 +112,7 @@ async function submit() {
 }
 
 async function addSkill() {
+  if (!canManageVolunteers.value) return
   const name = skillName.value.trim()
   if (!name) return
   skillError.value = ''
@@ -123,6 +128,7 @@ async function addSkill() {
 }
 
 async function removeSkill(item: Skill) {
+  if (!canManageVolunteers.value) return
   if (!confirm(`Удалить навык "${item.name}"?`)) return
   await deleteSkill(item.id)
   skills.value = skills.value.filter((skill) => skill.id !== item.id)
@@ -130,6 +136,7 @@ async function removeSkill(item: Skill) {
 }
 
 async function inviteUser() {
+  if (!canManageVolunteers.value) return
   const email = inviteEmail.value.trim()
   if (!email) return
   inviteError.value = ''
@@ -145,6 +152,7 @@ async function inviteUser() {
 }
 
 async function handleImportFile(event: Event) {
+  if (!canManageVolunteers.value) return
   const input = event.target as HTMLInputElement
   const file = input.files?.[0]
   if (!file) return
@@ -161,6 +169,7 @@ async function handleImportFile(event: Event) {
 }
 
 async function commitImport() {
+  if (!canManageVolunteers.value) return
   if (!importPreview.value || importPreview.value.validCount === 0) return
   importError.value = ''
   importMessage.value = ''
@@ -214,7 +223,7 @@ onMounted(load)
         <h1>Волонтеры</h1>
         <p>{{ volunteers.length }} профилей, {{ totalHours.toFixed(1) }} часов, средний уровень {{ averageLevel.toFixed(1) }}</p>
       </div>
-      <button class="secondary-action" type="button" @click="isHelpOpen = true">
+      <button v-if="canManageVolunteers" class="secondary-action" type="button" @click="isHelpOpen = true">
         <HelpCircle :size="18" />
         <span>Действия</span>
       </button>
@@ -279,7 +288,7 @@ onMounted(load)
             <RouterLink class="icon-button" :to="`/profile/${item.userId}`" aria-label="Открыть профиль">
               <Eye :size="17" />
             </RouterLink>
-            <button class="icon-button" type="button" aria-label="Редактировать профиль" @click="openEditModal(item)">
+            <button v-if="canManageVolunteers" class="icon-button" type="button" aria-label="Редактировать профиль" @click="openEditModal(item)">
               <Pencil :size="17" />
             </button>
           </div>
@@ -288,7 +297,7 @@ onMounted(load)
       <PaginationBar v-if="volunteers.length" v-model:page="page" :per-page="perPage" :total="volunteers.length" />
       <div v-else class="empty-state">Волонтеры не найдены.</div>
 
-      <aside class="detail-panel skill-panel">
+      <aside v-if="canManageVolunteers" class="detail-panel skill-panel">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Справочник</p>

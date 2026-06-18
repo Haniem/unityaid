@@ -17,6 +17,7 @@ import type { TaskItem } from '../entities/tasks/types'
 import type { EventItem } from '../entities/events/types'
 import type { Certificate } from '../entities/certificates/types'
 import type { ProfileFieldGroup, ProfileValue } from '../entities/profileFields/types'
+import { canManageContent } from '../shared/permissions'
 
 type ProfileTab = 'personal' | 'tasks' | 'work' | 'events' | 'results'
 const tabs: { id: ProfileTab; name: string; icon: object }[] = [
@@ -32,6 +33,7 @@ const currentPassword = ref('')
 const newPassword = ref('')
 const isSubmitting = ref(false)
 const isPasswordModalOpen = ref(false)
+const isProfileEditModalOpen = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 const gamification = ref<GamificationProfile | null>(null)
@@ -53,6 +55,23 @@ const profileEmail = computed(() => volunteer.value?.email || authState.user?.em
 const profileOrganizationName = computed(() => volunteer.value?.organizations[0]?.organizationName || authState.user?.organizations[0]?.organizationName || 'Не назначена')
 const initials = computed(() => `${volunteer.value?.firstName?.[0] ?? authState.user?.firstName?.[0] ?? ''}${volunteer.value?.lastName?.[0] ?? authState.user?.lastName?.[0] ?? ''}`.toUpperCase())
 const profileAvatar = computed(() => volunteer.value?.avatarUrl || (isOwnProfile.value ? authState.user?.avatarUrl : '') || '')
+const canEditProfile = computed(() => isOwnProfile.value || canManageContent(authState.user))
+const registrationDate = computed(() => volunteer.value?.createdAt ? new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long' }).format(new Date(volunteer.value.createdAt)) : 'Не указана')
+
+const personalInfoRows = computed(() => [
+  { label: 'Фамилия', value: volunteer.value?.lastName || 'Не указана' },
+  { label: 'Имя', value: volunteer.value?.firstName || 'Не указано' },
+  { label: 'Отчество', value: volunteer.value?.patronymic || 'Не указано' },
+  { label: 'Телефон', value: volunteer.value?.phone || 'Не указан' },
+  { label: 'Электронная почта', value: volunteer.value?.email || 'Не указана' }
+])
+
+function openProfileEditModal() {
+  if (!canEditProfile.value || !volunteer.value) return
+  errorMessage.value = ''
+  successMessage.value = ''
+  isProfileEditModalOpen.value = true
+}
 
 function openPasswordModal() {
   currentPassword.value = ''
@@ -90,10 +109,10 @@ async function uploadAvatar(event: Event) {
 }
 
 async function saveBaseProfile() {
-  if (!authState.user || !volunteer.value || !isOwnProfile.value) return
+  if (!authState.user || !volunteer.value || !canEditProfile.value) return
   isSubmitting.value = true
   try {
-    const response = await updateVolunteer(authState.user.id, {
+    const response = await updateVolunteer(profileUserId.value, {
       firstName: volunteer.value.firstName,
       lastName: volunteer.value.lastName,
       patronymic: volunteer.value.patronymic,
@@ -106,8 +125,9 @@ async function saveBaseProfile() {
       skillIds: volunteer.value.skills.map((skill) => skill.id)
     })
     volunteer.value = response.item
-    await fetchCurrentUser()
+    if (isOwnProfile.value) await fetchCurrentUser()
     successMessage.value = 'Данные профиля сохранены'
+    isProfileEditModalOpen.value = false
   } catch (error) { errorMessage.value = error instanceof Error ? error.message : 'Не удалось сохранить профиль' }
   finally { isSubmitting.value = false }
 }
@@ -199,21 +219,27 @@ watch(() => route.params.userId, () => { void load() })
           <div><dt>Организация</dt><dd>{{ profileOrganizationName }}</dd></div>
           <div><dt>Подтвержденные часы</dt><dd class="profile-hours"><Clock3 :size="15" />{{ totalApprovedHours.toFixed(1) }} ч.</dd></div>
           <div><dt>Баллы</dt><dd class="profile-hours"><Star :size="15" />{{ gamification?.points ?? 0 }}</dd></div>
+          <div><dt>Дата регистрации</dt><dd>{{ registrationDate }}</dd></div>
           <div v-if="isOwnProfile"><dt>Монеты</dt><dd class="profile-hours"><Coins :size="15" />{{ coinBalance ?? 0 }}</dd></div>
         </dl>
       </aside>
 
       <main class="profile-content">
         <section v-if="activeTab === 'personal' && volunteer" class="detail-panel">
-          <div class="section-heading"><div><p class="eyebrow">Персональные данные</p><h2>Личная информация</h2></div></div>
-          <form class="settings-form settings-form-grid" @submit.prevent="saveBaseProfile">
-            <label><span>Фамилия</span><input v-model="volunteer.lastName" required /></label>
-            <label><span>Имя</span><input v-model="volunteer.firstName" required /></label>
-            <label><span>Отчество</span><input v-model="volunteer.patronymic" /></label>
-            <label><span>Телефон</span><input v-model="volunteer.phone" type="tel" /></label>
-            <label class="settings-form-wide"><span>Электронная почта</span><input :value="volunteer.email" disabled /></label>
-            <div v-if="isOwnProfile" class="form-actions settings-form-wide"><button class="primary-action" :disabled="isSubmitting"><Save :size="17" />Сохранить</button></div>
-          </form>
+          <div class="section-heading">
+            <div><p class="eyebrow">Персональные данные</p><h2>Личная информация</h2></div>
+            <button v-if="canEditProfile" class="secondary-action" type="button" @click="openProfileEditModal">Редактировать</button>
+          </div>
+          <div class="profile-info-grid">
+            <article v-for="row in personalInfoRows" :key="row.label" class="profile-info-card">
+              <span>{{ row.label }}</span>
+              <strong>{{ row.value }}</strong>
+            </article>
+            <article class="profile-info-card">
+              <span>Дата регистрации</span>
+              <strong>{{ registrationDate }}</strong>
+            </article>
+          </div>
         </section>
 
         <section v-if="activeTab === 'work' && volunteer" class="detail-panel">
@@ -273,6 +299,28 @@ watch(() => route.params.userId, () => { void load() })
         <label><span>Текущий пароль</span><input v-model="currentPassword" type="password" autocomplete="current-password" required /></label>
         <label><span>Новый пароль</span><input v-model="newPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
         <div class="form-actions"><button class="secondary-action" type="button" @click="isPasswordModalOpen = false">Отмена</button><button class="primary-action" type="submit" :disabled="isSubmitting">Обновить пароль</button></div>
+      </form>
+    </div>
+
+    <div v-if="isProfileEditModalOpen && volunteer" class="modal-backdrop" @click.self="isProfileEditModalOpen = false">
+      <form class="modal-panel entity-form profile-edit-modal" @submit.prevent="saveBaseProfile">
+        <div class="modal-heading">
+          <div>
+            <p class="eyebrow">Профиль</p>
+            <h2>Редактирование данных</h2>
+          </div>
+        </div>
+        <div class="settings-form-grid">
+          <label><span>Фамилия</span><input v-model="volunteer.lastName" required /></label>
+          <label><span>Имя</span><input v-model="volunteer.firstName" required /></label>
+          <label><span>Отчество</span><input v-model="volunteer.patronymic" /></label>
+          <label><span>Телефон</span><input v-model="volunteer.phone" type="tel" /></label>
+          <label class="settings-form-wide"><span>Электронная почта</span><input :value="volunteer.email" disabled /></label>
+        </div>
+        <div class="form-actions">
+          <button class="secondary-action" type="button" @click="isProfileEditModalOpen = false">Отмена</button>
+          <button class="primary-action" type="submit" :disabled="isSubmitting"><Save :size="17" />Сохранить</button>
+        </div>
       </form>
     </div>
   </section>

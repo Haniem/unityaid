@@ -212,8 +212,8 @@ onMounted(load)
               <CustomSelect v-model="statusFilter" :options="timeStatusOptions" @update:model-value="load" />
             </label>
             <label class="filter-select compact-filter time-user-filter">
-              <span>????????????</span>
-              <AsyncSelect v-model="userFilter" :load-options="loadUserOptions" placeholder="??? ????????????" @update:model-value="load" />
+              <span>Пользователь</span>
+              <AsyncSelect v-model="userFilter" :load-options="loadUserOptions" placeholder="Все пользователи" @update:model-value="load" />
             </label>
           </div>
 

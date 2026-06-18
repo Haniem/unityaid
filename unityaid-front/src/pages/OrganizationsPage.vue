@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { Eye, Pencil, Plus, Search, Trash2 } from 'lucide-vue-next'
-import { createOrganization, deleteOrganization, fetchOrganizations, updateOrganization } from '../entities/organizations/api'
+import { createOrganization, deleteOrganization, fetchOrganization, fetchOrganizations, updateOrganization } from '../entities/organizations/api'
 import type { Organization, OrganizationPayload } from '../entities/organizations/types'
 import { fetchCreateForm, fetchEditForm } from '../entities/forms/api'
 import type { BackendForm, FormModel } from '../entities/forms/types'
@@ -9,6 +9,8 @@ import DynamicForm from '../shared/ui/DynamicForm.vue'
 import PaginationBar from '../shared/ui/PaginationBar.vue'
 import { modelFromForm, nullable, stringValue } from '../shared/forms'
 import { useClientPagination } from '../shared/pagination'
+import { authState } from '../entities/auth/store'
+import { canManageOrganizations } from '../shared/permissions'
 
 const items = ref<Organization[]>([])
 const editingId = ref<string | null>(null)
@@ -21,6 +23,7 @@ const formModel = ref<FormModel>({})
 const { page, perPage, pageItems } = useClientPagination(items, 12)
 
 const activeCount = computed(() => items.value.filter((item) => !item.isDeleted).length)
+const canManageOrganizationRecords = computed(() => canManageOrganizations(authState.user))
 
 function resetForm() {
   editingId.value = null
@@ -30,6 +33,7 @@ function resetForm() {
 }
 
 async function openCreateModal() {
+  if (!canManageOrganizationRecords.value) return
   resetForm()
   formSchema.value = await fetchCreateForm('organizations')
   formModel.value = modelFromForm(formSchema.value)
@@ -37,6 +41,7 @@ async function openCreateModal() {
 }
 
 async function openEditModal(item: Organization) {
+  if (!canManageOrganizationRecords.value) return
   editingId.value = item.id
   formSchema.value = await fetchEditForm('organizations', item.id)
   formModel.value = modelFromForm(formSchema.value)
@@ -50,6 +55,16 @@ function closeModal() {
 }
 
 async function load() {
+  if (!canManageOrganizationRecords.value && authState.user?.organizations.length) {
+    const searchTerm = search.value.trim().toLowerCase()
+    const loaded = await Promise.all(
+      authState.user.organizations.map((membership) => fetchOrganization(membership.organizationId).then((response) => response.item).catch(() => null))
+    )
+    items.value = loaded
+      .filter((item): item is Organization => Boolean(item))
+      .filter((item) => !searchTerm || [item.name, item.slug, item.description, item.contactEmail ?? ''].some((value) => value.toLowerCase().includes(searchTerm)))
+    return
+  }
   const response = await fetchOrganizations({ search: search.value, includeDeleted: includeDeleted.value })
   items.value = response.items
 }
@@ -68,6 +83,7 @@ function payload(): OrganizationPayload {
 }
 
 async function submit() {
+  if (!canManageOrganizationRecords.value) return
   errorMessage.value = ''
   try {
     if (editingId.value) await updateOrganization(editingId.value, payload())
@@ -80,6 +96,7 @@ async function submit() {
 }
 
 async function remove(item: Organization) {
+  if (!canManageOrganizationRecords.value) return
   if (!confirm(`Архивировать организацию "${item.name}"? Связанные данные сохранятся.`)) return
   await deleteOrganization(item.id)
   await load()
@@ -106,11 +123,11 @@ onMounted(load)
         <Search :size="18" />
         <input v-model="search" type="search" placeholder="Поиск по названию, slug, описанию или email" />
       </label>
-      <label class="archive-toggle">
+      <label v-if="canManageOrganizationRecords" class="archive-toggle">
         <input v-model="includeDeleted" type="checkbox" />
         <span>Архив</span>
       </label>
-      <button class="primary-action" type="button" @click="openCreateModal">
+      <button v-if="canManageOrganizationRecords" class="primary-action" type="button" @click="openCreateModal">
         <Plus :size="18" />
         <span>Создать</span>
       </button>
@@ -130,10 +147,10 @@ onMounted(load)
         </div>
         <div class="card-actions">
           <RouterLink class="icon-button" :to="`/organizations/${item.id}`" aria-label="Открыть"><Eye :size="17" /></RouterLink>
-          <button class="icon-button" type="button" aria-label="Редактировать" :disabled="item.isDeleted" @click="openEditModal(item)">
+          <button v-if="canManageOrganizationRecords" class="icon-button" type="button" aria-label="Редактировать" :disabled="item.isDeleted" @click="openEditModal(item)">
             <Pencil :size="17" />
           </button>
-          <button class="icon-button" type="button" aria-label="Архивировать" :disabled="item.isDeleted" @click="remove(item)">
+          <button v-if="canManageOrganizationRecords" class="icon-button" type="button" aria-label="Архивировать" :disabled="item.isDeleted" @click="remove(item)">
             <Trash2 :size="17" />
           </button>
         </div>

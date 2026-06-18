@@ -24,11 +24,13 @@ import { fetchVolunteers } from '../entities/users/api'
 import { createInvitation } from '../entities/invitations/api'
 import type { Invitation } from '../entities/invitations/types'
 import type { PossibleValue } from '../entities/forms/types'
+import { authState } from '../entities/auth/store'
 import CustomSelect from '../shared/ui/CustomSelect.vue'
 import AsyncSelect from '../shared/ui/AsyncSelect.vue'
 import PaginationBar from '../shared/ui/PaginationBar.vue'
 import { useClientPagination } from '../shared/pagination'
 import { formatDateTime } from '../shared/date'
+import { canManageOrganizations } from '../shared/permissions'
 
 const route = useRoute()
 const organizationId = computed(() => String(route.params.id))
@@ -48,6 +50,7 @@ const isSettingsModalOpen = ref(false)
 const isEventFiltersOpen = ref(false)
 const { page, perPage, pageItems } = useClientPagination(members, 10)
 const eventFilters = reactive({ startsAt: '', endsAt: '', executorId: '' })
+const canManageOrganizationDetails = computed(() => canManageOrganizations(authState.user))
 
 const memberForm = reactive<AddOrganizationMemberPayload>({
   email: '',
@@ -140,6 +143,7 @@ async function load() {
 }
 
 function openSettingsModal() {
+  if (!canManageOrganizationDetails.value) return
   if (!item.value) return
   settingsMessage.value = ''
   settingsError.value = ''
@@ -152,6 +156,7 @@ function nullable(value: string | null | undefined) {
 }
 
 async function saveSettings() {
+  if (!canManageOrganizationDetails.value) return
   if (!item.value) return
   settingsError.value = ''
   settingsMessage.value = ''
@@ -174,6 +179,7 @@ async function saveSettings() {
 }
 
 async function addMember() {
+  if (!canManageOrganizationDetails.value) return
   memberError.value = ''
   try {
     await addOrganizationMember(organizationId.value, memberForm)
@@ -209,6 +215,7 @@ function resetEventFilters() {
 }
 
 async function generateVolunteerInvite() {
+  if (!canManageOrganizationDetails.value) return
   if (!item.value) return
   inviteMessage.value = ''
   inviteError.value = ''
@@ -231,6 +238,7 @@ async function copyInviteLink() {
 }
 
 async function updateMember(member: OrganizationMember) {
+  if (!canManageOrganizationDetails.value) return
   memberError.value = ''
   try {
     const response = await updateOrganizationMember(organizationId.value, member.id, {
@@ -245,6 +253,7 @@ async function updateMember(member: OrganizationMember) {
 }
 
 async function removeMember(member: OrganizationMember) {
+  if (!canManageOrganizationDetails.value) return
   if (!confirm(`Удалить ${member.email} из организации?`)) return
   await removeOrganizationMember(organizationId.value, member.id)
   members.value = members.value.filter((item) => item.id !== member.id)
@@ -267,8 +276,8 @@ onMounted(load)
           </div>
         </div>
         <div class="page-actions">
-          <button class="secondary-action" type="button" @click="generateVolunteerInvite"><Link2 :size="17" /> Ссылка для волонтера</button>
-          <button class="secondary-action" type="button" @click="openSettingsModal">Редактировать организацию</button>
+          <button v-if="canManageOrganizationDetails" class="secondary-action" type="button" @click="generateVolunteerInvite"><Link2 :size="17" /> Ссылка для волонтера</button>
+          <button v-if="canManageOrganizationDetails" class="secondary-action" type="button" @click="openSettingsModal">Редактировать организацию</button>
           <RouterLink class="secondary-action" to="/organizations">К списку</RouterLink>
         </div>
       </div>
@@ -296,7 +305,7 @@ onMounted(load)
         </div>
       </div>
 
-      <section v-if="generatedInvite || inviteMessage || inviteError" class="detail-panel invite-link-panel">
+      <section v-if="canManageOrganizationDetails && (generatedInvite || inviteMessage || inviteError)" class="detail-panel invite-link-panel">
         <div class="section-heading">
           <div>
             <p class="eyebrow">Регистрация волонтера</p>
@@ -323,7 +332,7 @@ onMounted(load)
             </div>
           </div>
 
-          <form class="inline-member-form" @submit.prevent="addMember">
+          <form v-if="canManageOrganizationDetails" class="inline-member-form" @submit.prevent="addMember">
             <input v-model="memberForm.email" type="email" placeholder="email пользователя" required />
             <CustomSelect v-model="memberForm.role" :options="roleOptions" />
             <CustomSelect v-model="memberForm.status" :options="statusOptions" />
@@ -339,9 +348,11 @@ onMounted(load)
                 <strong>{{ member.lastName }} {{ member.firstName }}</strong>
                 <small>{{ member.email }}</small>
               </div>
-              <CustomSelect v-model="member.role" :options="roleOptions" @update:model-value="updateMember(member)" />
-              <CustomSelect v-model="member.status" :options="statusOptions" @update:model-value="updateMember(member)" />
-              <button class="icon-button" type="button" aria-label="Удалить участника" @click="removeMember(member)">
+              <CustomSelect v-if="canManageOrganizationDetails" v-model="member.role" :options="roleOptions" @update:model-value="updateMember(member)" />
+              <span v-else class="status-pill">{{ roleOptions.find((role) => role.id === member.role)?.name || member.role }}</span>
+              <CustomSelect v-if="canManageOrganizationDetails" v-model="member.status" :options="statusOptions" @update:model-value="updateMember(member)" />
+              <span v-else class="status-pill">{{ statusOptions.find((status) => status.id === member.status)?.name || member.status }}</span>
+              <button v-if="canManageOrganizationDetails" class="icon-button" type="button" aria-label="Удалить участника" @click="removeMember(member)">
                 <Trash2 :size="17" />
               </button>
             </article>

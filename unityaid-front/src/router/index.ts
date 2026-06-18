@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { authState, fetchCurrentUser } from '../entities/auth/store'
+import { hasSystemAdminRole } from '../shared/permissions'
 import AppLayout from '../widgets/layout/AppLayout.vue'
 import DashboardPage from '../pages/DashboardPage.vue'
 import LoginPage from '../pages/LoginPage.vue'
@@ -97,7 +98,8 @@ export const router = createRouter({
         {
           path: 'admin',
           name: 'admin',
-          component: AdminPanelPage
+          component: AdminPanelPage,
+          meta: { roles: ['super_admin'] }
         },
         {
           path: 'organizations',
@@ -189,12 +191,14 @@ export const router = createRouter({
         {
           path: 'knowledge-base/new',
           name: 'knowledge-base-new',
-          component: KnowledgeFormPage
+          component: KnowledgeFormPage,
+          meta: { roles: ['super_admin', 'org_admin', 'coordinator'] }
         },
         {
           path: 'knowledge-base/:id/edit',
           name: 'knowledge-base-edit',
-          component: KnowledgeFormPage
+          component: KnowledgeFormPage,
+          meta: { roles: ['super_admin', 'org_admin', 'coordinator'] }
         },
         {
           path: 'knowledge-base/:id',
@@ -204,12 +208,14 @@ export const router = createRouter({
         {
           path: 'analytics',
           name: 'analytics',
-          component: AnalyticsPage
+          component: AnalyticsPage,
+          meta: { roles: ['super_admin', 'org_admin', 'coordinator'] }
         },
         {
           path: 'analytics/:report',
           name: 'analytics-report',
-          component: AnalyticsPage
+          component: AnalyticsPage,
+          meta: { roles: ['super_admin', 'org_admin', 'coordinator'] }
         },
         {
           path: 'news',
@@ -219,12 +225,14 @@ export const router = createRouter({
         {
           path: 'news/new',
           name: 'news-new',
-          component: NewsFormPage
+          component: NewsFormPage,
+          meta: { roles: ['super_admin', 'org_admin', 'coordinator'] }
         },
         {
           path: 'news/:id/edit',
           name: 'news-edit',
-          component: NewsFormPage
+          component: NewsFormPage,
+          meta: { roles: ['super_admin', 'org_admin', 'coordinator'] }
         },
         {
           path: 'news/:id',
@@ -246,7 +254,7 @@ router.beforeEach(async (to) => {
   }
 
   const roles = to.meta.roles as string[] | undefined
-  if (roles?.length && !roles.includes(authState.user?.primaryRole ?? '')) {
+  if (roles?.length && !roles.includes(authState.user?.primaryRole ?? '') && !hasSystemAdminRole(authState.user)) {
     return { name: 'dashboard' }
   }
 

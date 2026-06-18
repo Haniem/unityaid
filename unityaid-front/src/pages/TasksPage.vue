@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Eye, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { addTaskAttachment, createTask, deleteTask, fetchTasks, updateTask } from '../entities/tasks/api'
 import type { TaskItem, TaskPayload } from '../entities/tasks/types'
@@ -11,6 +11,8 @@ import PaginationBar from '../shared/ui/PaginationBar.vue'
 import { isoFromDatetimeLocal, modelFromForm, nullable, stringValue } from '../shared/forms'
 import { formatDateTime } from '../shared/date'
 import { useClientPagination } from '../shared/pagination'
+import { authState } from '../entities/auth/store'
+import { canManageContent } from '../shared/permissions'
 
 const items = ref<TaskItem[]>([])
 const editingId = ref<string | null>(null)
@@ -22,6 +24,7 @@ const formSchema = ref<BackendForm | null>(null)
 const formModel = ref<FormModel>({})
 const attachmentDraft = ref({ fileName: '', fileUrl: '' })
 const { page, perPage, pageItems } = useClientPagination(items, 12)
+const canManageTasks = computed(() => canManageContent(authState.user))
 
 const statusOptions = [
   { id: '', name: 'Все статусы' },
@@ -47,6 +50,7 @@ function resetForm() {
 }
 
 async function openCreateModal() {
+  if (!canManageTasks.value) return
   resetForm()
   formSchema.value = await fetchCreateForm('tasks')
   formModel.value = modelFromForm(formSchema.value)
@@ -54,6 +58,7 @@ async function openCreateModal() {
 }
 
 async function openEditModal(item: TaskItem) {
+  if (!canManageTasks.value) return
   editingId.value = item.id
   formSchema.value = await fetchEditForm('tasks', item.id)
   formModel.value = modelFromForm(formSchema.value)
@@ -83,6 +88,7 @@ async function load() {
 }
 
 async function submit() {
+  if (!canManageTasks.value) return
   errorMessage.value = ''
   try {
     if (editingId.value) {
@@ -104,6 +110,7 @@ async function submit() {
 }
 
 async function remove(item: TaskItem) {
+  if (!canManageTasks.value) return
   if (!confirm(`Удалить задачу "${item.title}"?`)) return
   await deleteTask(item.id)
   await load()
@@ -119,7 +126,7 @@ onMounted(load)
         <p class="eyebrow">Раздел</p>
         <h1>Мои задачи</h1>
       </div>
-      <button class="primary-action" type="button" @click="openCreateModal">
+      <button v-if="canManageTasks" class="primary-action" type="button" @click="openCreateModal">
         <Plus :size="18" />
         <span>Создать</span>
       </button>
@@ -146,8 +153,8 @@ onMounted(load)
         </RouterLink>
         <div class="card-actions">
           <RouterLink class="icon-button" :to="`/tasks/${item.id}`" aria-label="Открыть"><Eye :size="17" /></RouterLink>
-          <button class="icon-button" type="button" aria-label="Редактировать" @click="openEditModal(item)"><Pencil :size="17" /></button>
-          <button class="icon-button" type="button" aria-label="Удалить" @click="remove(item)"><Trash2 :size="17" /></button>
+          <button v-if="canManageTasks" class="icon-button" type="button" aria-label="Редактировать" @click="openEditModal(item)"><Pencil :size="17" /></button>
+          <button v-if="canManageTasks" class="icon-button" type="button" aria-label="Удалить" @click="remove(item)"><Trash2 :size="17" /></button>
         </div>
       </article>
     </div>

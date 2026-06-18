@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Pencil } from 'lucide-vue-next'
 import { fetchKnowledgeArticle } from '../entities/knowledge/api'
 import type { KnowledgeArticle } from '../entities/knowledge/types'
+import { authState } from '../entities/auth/store'
+import { canManageContent } from '../shared/permissions'
 
 const route = useRoute()
 const item = ref<KnowledgeArticle | null>(null)
 const isLoading = ref(true)
 const errorMessage = ref('')
+const canManageKnowledge = computed(() => canManageContent(authState.user))
 
 function formatDate(value?: string | null) {
   if (!value) return ''
@@ -39,7 +42,7 @@ onMounted(async () => {
           <p>{{ item.summary }}</p>
           <small>{{ item.authorName || 'Пульс' }} · {{ formatDate(item.publishedAt || item.createdAt) }}</small>
         </div>
-        <RouterLink class="secondary-action" :to="`/knowledge-base/${item.id}/edit`">
+        <RouterLink v-if="canManageKnowledge" class="secondary-action" :to="`/knowledge-base/${item.id}/edit`">
           <Pencil :size="18" />
           Редактировать
         </RouterLink>

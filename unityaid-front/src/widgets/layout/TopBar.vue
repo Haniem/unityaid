@@ -31,6 +31,7 @@ import { authState, logoutRemote } from '../../entities/auth/store'
 import { fetchNotifications, markAllNotificationsRead, markNotificationRead } from '../../entities/notifications/api'
 import type { NotificationItem } from '../../entities/notifications/types'
 import { tenantTheme } from '../../entities/tenantSettings/theme'
+import { canManageContent } from '../../shared/permissions'
 
 const router = useRouter()
 const route = useRoute()
@@ -49,7 +50,7 @@ const navigationButtonRef = ref<HTMLElement | null>(null)
 const notificationsButtonRef = ref<HTMLElement | null>(null)
 const createButtonRef = ref<HTMLElement | null>(null)
 
-const navigationItems = [
+const navigationItems = computed(() => [
   { label: 'Главная', icon: Home, to: '/' },
   { label: 'Задачи', icon: ListTodo, to: '/tasks' },
   { label: 'События', icon: CalendarDays, to: '/calendar' },
@@ -58,11 +59,11 @@ const navigationItems = [
   { label: 'Достижения', icon: Award, to: '/achievements' },
   { label: 'Сертификаты', icon: FileCheck2, to: '/certificates' },
   { label: 'База знаний', icon: BookOpen, to: '/knowledge-base' },
-  { label: 'Аналитика', icon: BarChart3, to: '/analytics' },
+  ...(canUseCreateActions.value ? [{ label: 'Аналитика', icon: BarChart3, to: '/analytics' }] : []),
   { label: 'Волонтеры', icon: UsersRound, to: '/volunteers' },
   { label: 'Организации', icon: Network, to: '/organizations' },
   { label: 'Новости', icon: Newspaper, to: '/news' }
-]
+])
 
 const createActions = [
   { label: 'Создать мероприятие', icon: CalendarDays, to: '/calendar' },
@@ -83,6 +84,7 @@ const userInitials = computed(() => {
 })
 
 const canOpenSettings = computed(() => ['super_admin', 'org_admin', 'coordinator'].includes(authState.user?.primaryRole ?? ''))
+const canUseCreateActions = computed(() => canManageContent(authState.user))
 
 const visibleNotifications = computed(() => {
   if (notificationTab.value === 'unread') {
@@ -128,6 +130,7 @@ function toggleUserMenu() {
 }
 
 function toggleCreateMenu() {
+  if (!canUseCreateActions.value) return
   isCreateMenuOpen.value = !isCreateMenuOpen.value
   isUserMenuOpen.value = false
   isNavigationMenuOpen.value = false
@@ -234,7 +237,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div class="topbar-actions">
-      <button ref="createButtonRef" class="icon-button accent topbar-secondary-action" type="button" aria-label="Создать" @click="toggleCreateMenu"><Plus :size="20" /></button>
+      <button v-if="canUseCreateActions" ref="createButtonRef" class="icon-button accent topbar-secondary-action" type="button" aria-label="Создать" @click="toggleCreateMenu"><Plus :size="20" /></button>
       <button
         ref="notificationsButtonRef"
         :class="['icon-button topbar-secondary-action', { accent: isNotificationsOpen }]"
@@ -263,7 +266,7 @@ onBeforeUnmount(() => {
     </div>
 
     <Transition name="popover-scale">
-      <div v-if="isCreateMenuOpen" ref="createPopoverRef" class="create-popover">
+      <div v-if="isCreateMenuOpen && canUseCreateActions" ref="createPopoverRef" class="create-popover">
         <RouterLink
           v-for="action in createActions"
           :key="action.to"
@@ -352,16 +355,18 @@ onBeforeUnmount(() => {
 
         <div class="mobile-user-actions">
           <p>Быстрые действия</p>
-          <RouterLink
-            v-for="action in createActions"
-            :key="action.to"
-            class="popover-link"
-            :to="action.to"
-            @click="isUserMenuOpen = false"
-          >
-            <component :is="action.icon" :size="17" />
-            <span>{{ action.label }}</span>
-          </RouterLink>
+          <template v-if="canUseCreateActions">
+            <RouterLink
+              v-for="action in createActions"
+              :key="action.to"
+              class="popover-link"
+              :to="action.to"
+              @click="isUserMenuOpen = false"
+            >
+              <component :is="action.icon" :size="17" />
+              <span>{{ action.label }}</span>
+            </RouterLink>
+          </template>
           <button class="popover-link" type="button" @click="openNotificationsFromUserMenu">
             <Bell :size="17" />
             <span>Уведомления</span>

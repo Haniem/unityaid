@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { Eye, MapPin, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { createEvent, createEventTemplate, createRecurringEvents, deleteEvent, fetchEventTemplates, fetchEvents, updateEvent } from '../entities/events/api'
 import type { EventItem, EventPayload, EventTemplate } from '../entities/events/types'
@@ -10,6 +10,8 @@ import PaginationBar from '../shared/ui/PaginationBar.vue'
 import { isoFromDatetimeLocal, modelFromForm, nullable, numberOrNull, stringValue } from '../shared/forms'
 import { formatDateTime } from '../shared/date'
 import { useClientPagination } from '../shared/pagination'
+import { authState } from '../entities/auth/store'
+import { canManageContent } from '../shared/permissions'
 
 const items = ref<EventItem[]>([])
 const templates = ref<EventTemplate[]>([])
@@ -25,6 +27,7 @@ const isRecurring = ref(false)
 const recurringFrequency = ref('weekly')
 const recurringCount = ref(1)
 const { page, perPage, pageItems } = useClientPagination(items, 10)
+const canManageEvents = computed(() => canManageContent(authState.user))
 
 const statusLabels: Record<string, string> = {
   draft: 'Черновик',
@@ -53,6 +56,7 @@ function resetForm() {
 }
 
 async function openCreateModal() {
+  if (!canManageEvents.value) return
   resetForm()
   formSchema.value = await fetchCreateForm('events')
   formModel.value = modelFromForm(formSchema.value)
@@ -60,6 +64,7 @@ async function openCreateModal() {
 }
 
 async function openEditModal(item: EventItem) {
+  if (!canManageEvents.value) return
   editingId.value = item.id
   formSchema.value = await fetchEditForm('events', item.id)
   formModel.value = modelFromForm(formSchema.value)
@@ -92,6 +97,7 @@ async function load() {
 }
 
 async function submit() {
+  if (!canManageEvents.value) return
   errorMessage.value = ''
   try {
     const eventPayload = payload()
@@ -132,6 +138,7 @@ function applyTemplate() {
 }
 
 async function remove(item: EventItem) {
+  if (!canManageEvents.value) return
   if (!confirm(`Удалить мероприятие "${item.title}"?`)) return
   await deleteEvent(item.id)
   await load()
@@ -147,7 +154,7 @@ onMounted(load)
         <p class="eyebrow">Раздел</p>
         <h1>Мероприятия</h1>
       </div>
-      <button class="primary-action" type="button" @click="openCreateModal">
+      <button v-if="canManageEvents" class="primary-action" type="button" @click="openCreateModal">
         <Plus :size="18" />
         <span>Создать</span>
       </button>
@@ -167,8 +174,8 @@ onMounted(load)
         </RouterLink>
         <div class="card-actions">
           <RouterLink class="icon-button" :to="`/calendar/${item.id}`" aria-label="Открыть"><Eye :size="17" /></RouterLink>
-          <button class="icon-button" type="button" aria-label="Редактировать" @click="openEditModal(item)"><Pencil :size="17" /></button>
-          <button class="icon-button" type="button" aria-label="Удалить" @click="remove(item)"><Trash2 :size="17" /></button>
+          <button v-if="canManageEvents" class="icon-button" type="button" aria-label="Редактировать" @click="openEditModal(item)"><Pencil :size="17" /></button>
+          <button v-if="canManageEvents" class="icon-button" type="button" aria-label="Удалить" @click="remove(item)"><Trash2 :size="17" /></button>
         </div>
       </article>
     </div>

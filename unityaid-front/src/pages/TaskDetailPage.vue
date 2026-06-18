@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { Clock3, Flag, Link as LinkIcon } from 'lucide-vue-next'
 import {
@@ -18,6 +18,8 @@ import type { PossibleValue } from '../entities/forms/types'
 import { formatDateTime } from '../shared/date'
 import AsyncSelect from '../shared/ui/AsyncSelect.vue'
 import CustomSelect from '../shared/ui/CustomSelect.vue'
+import { authState } from '../entities/auth/store'
+import { canManageContent } from '../shared/permissions'
 
 const route = useRoute()
 const taskId = String(route.params.id)
@@ -30,6 +32,7 @@ const errorMessage = ref('')
 const assignment = reactive({ userId: '', role: 'assignee' })
 const comment = ref('')
 const timeEntry = reactive({ hours: '', note: '' })
+const canManageTask = computed(() => canManageContent(authState.user))
 
 const assignmentRoleOptions = [
   { id: 'assignee', name: 'Исполнитель' },
@@ -90,6 +93,7 @@ async function loadUserOptions(params: { search: string; page: number; perPage: 
 }
 
 async function submitAssignment() {
+  if (!canManageTask.value) return
   if (!assignment.userId) return
   item.value = (await assignTask(taskId, assignment)).item
   assignment.userId = ''
@@ -104,6 +108,7 @@ async function submitComment() {
 }
 
 async function submitTime() {
+  if (!canManageTask.value) return
   await addTaskTimeEntry(taskId, { hours: Number(timeEntry.hours), note: timeEntry.note })
   timeEntry.hours = ''
   timeEntry.note = ''
@@ -154,7 +159,7 @@ onMounted(load)
       <div class="management-grid task-management-grid">
         <section class="detail-panel">
           <p class="eyebrow">Исполнители</p>
-          <form class="inline-member-form task-assignment-form" @submit.prevent="submitAssignment">
+          <form v-if="canManageTask" class="inline-member-form task-assignment-form" @submit.prevent="submitAssignment">
             <AsyncSelect v-model="assignment.userId" :load-options="loadUserOptions" placeholder="Выберите исполнителя" />
             <CustomSelect v-model="assignment.role" :options="assignmentRoleOptions" />
             <button class="primary-action" type="submit">Назначить</button>
@@ -185,7 +190,7 @@ onMounted(load)
 
         <section class="detail-panel">
           <p class="eyebrow">Учет времени</p>
-          <form class="inline-member-form task-time-form" @submit.prevent="submitTime">
+          <form v-if="canManageTask" class="inline-member-form task-time-form" @submit.prevent="submitTime">
             <input v-model="timeEntry.hours" type="number" step="0.25" placeholder="часы" required />
             <input v-model="timeEntry.note" placeholder="комментарий" />
             <button class="primary-action" type="submit">Учесть</button>

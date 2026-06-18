@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { Filter, Pencil, Plus, Search, Trash2, X } from 'lucide-vue-next'
 import { deleteNews, fetchNewsCategories, fetchNewsList } from '../entities/news/api'
 import type { NewsCategory, NewsItem } from '../entities/news/types'
 import CustomSelect from '../shared/ui/CustomSelect.vue'
 import PaginationBar from '../shared/ui/PaginationBar.vue'
 import { useClientPagination } from '../shared/pagination'
+import { authState } from '../entities/auth/store'
+import { canManageContent } from '../shared/permissions'
 
 const items = ref<NewsItem[]>([])
 const categories = ref<NewsCategory[]>([])
@@ -16,6 +18,7 @@ const search = ref('')
 const status = ref('')
 const categoryId = ref('')
 const { page, perPage, pageItems } = useClientPagination(items, 12)
+const canManageNews = computed(() => canManageContent(authState.user))
 
 const statusOptions = [
   { id: '', name: 'Все статусы' },
@@ -45,6 +48,7 @@ async function loadNews() {
 }
 
 async function removeNews(item: NewsItem) {
+  if (!canManageNews.value) return
   if (!confirm(`Удалить новость "${item.title}"?`)) return
   await deleteNews(item.id)
   await loadNews()
@@ -82,7 +86,7 @@ onMounted(async () => {
         <Filter :size="18" />
         <span>Фильтры</span>
       </button>
-      <RouterLink class="primary-action" to="/news/new">
+      <RouterLink v-if="canManageNews" class="primary-action" to="/news/new">
         <Plus :size="18" />
         <span>Создать</span>
       </RouterLink>
@@ -104,7 +108,7 @@ onMounted(async () => {
           <p>{{ item.summary || 'Краткое описание пока не заполнено.' }}</p>
           <div class="news-card-footer">
             <small>{{ item.organizationName || 'Без организации' }} · {{ formatDate(item.scheduledAt || item.publishedAt || item.createdAt) }}</small>
-            <div class="card-actions">
+            <div v-if="canManageNews" class="card-actions">
               <RouterLink class="icon-button" :to="`/news/${item.id}/edit`" aria-label="Редактировать"><Pencil :size="17" /></RouterLink>
               <button class="icon-button" type="button" aria-label="Удалить" @click="removeNews(item)"><Trash2 :size="17" /></button>
             </div>

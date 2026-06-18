@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { BookOpen, Filter, Pencil, Plus, Search, Trash2, X } from 'lucide-vue-next'
 import {
   deleteKnowledgeArticle,
@@ -10,6 +10,8 @@ import type { KnowledgeArticle, KnowledgeCategory } from '../entities/knowledge/
 import CustomSelect from '../shared/ui/CustomSelect.vue'
 import PaginationBar from '../shared/ui/PaginationBar.vue'
 import { useClientPagination } from '../shared/pagination'
+import { authState } from '../entities/auth/store'
+import { canManageContent } from '../shared/permissions'
 
 const items = ref<KnowledgeArticle[]>([])
 const categories = ref<KnowledgeCategory[]>([])
@@ -20,6 +22,7 @@ const search = ref('')
 const status = ref('')
 const categoryId = ref('')
 const { page, perPage, pageItems } = useClientPagination(items, 12)
+const canManageKnowledge = computed(() => canManageContent(authState.user))
 
 const statusOptions = [
   { id: '', name: 'Все статусы' },
@@ -42,6 +45,7 @@ async function load() {
 }
 
 async function removeArticle(item: KnowledgeArticle) {
+  if (!canManageKnowledge.value) return
   if (!confirm(`Удалить статью "${item.title}"?`)) return
   await deleteKnowledgeArticle(item.id)
   await load()
@@ -79,7 +83,7 @@ onMounted(async () => {
         <Filter :size="18" />
         <span>Фильтры</span>
       </button>
-      <RouterLink class="primary-action" to="/knowledge-base/new">
+      <RouterLink v-if="canManageKnowledge" class="primary-action" to="/knowledge-base/new">
         <Plus :size="18" />
         <span>Создать</span>
       </RouterLink>
@@ -100,7 +104,7 @@ onMounted(async () => {
             <small>{{ item.authorName || 'Пульс' }} · {{ formatDate(item.publishedAt || item.createdAt) }}</small>
           </div>
         </RouterLink>
-        <div class="card-actions">
+        <div v-if="canManageKnowledge" class="card-actions">
           <RouterLink class="icon-button" :to="`/knowledge-base/${item.id}/edit`" aria-label="Редактировать"><Pencil :size="17" /></RouterLink>
           <button class="icon-button" type="button" aria-label="Удалить" @click="removeArticle(item)"><Trash2 :size="17" /></button>
         </div>
