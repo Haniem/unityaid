@@ -8,6 +8,7 @@ ON CONFLICT (id) DO UPDATE
 SET name = EXCLUDED.name,
 	slug = EXCLUDED.slug;
 
+;
 INSERT INTO news (
 	id,
 	organization_id,
